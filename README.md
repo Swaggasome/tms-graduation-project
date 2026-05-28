@@ -7,3 +7,5 @@
 * Интеграции: Экспорт события в .ics файл (для импорта в Outlook/Google Календарь).
 
 ### Фреймворк для написания  приложения - Django
+
+terraform output -raw yc_sa_json_credentials_raw 
