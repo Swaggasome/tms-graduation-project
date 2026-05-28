@@ -9,19 +9,16 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      # 1. Клонируем код
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. Логинимся в Yandex Cloud Container Registry
       - name: Login to Yandex CR
         id: login-cr
         uses: yc-actions/yc-cr-login@v1
         with:
           yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
 
-      # 3. Собираем Docker-образ и пушим его в реестр
-      - name: Build, tag, and push image to Yandex CR
+      - name: Build, tag, and push image
         env:
           CR_REGISTRY: ${{ secrets.CR_REGISTRY_ID }}
           CR_REPOSITORY: ${{ secrets.CR_REPOSITORY }}
@@ -32,45 +29,47 @@ jobs:
           docker tag cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$IMAGE_TAG cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:latest
           docker push cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:latest
           
-      # 4. Устанавливаем yc CLI (альтернативный способ)
       - name: Install yc CLI
         run: |
           curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
           echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
-          echo "YC_INSTALL_DIR=$HOME/yandex-cloud" >> $GITHUB_ENV
       
-      # 5. Аутентифицируем yc CLI через JSON-ключ
       - name: Authenticate yc CLI
+        env:
+          YC_SA_JSON_CREDENTIALS: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
         run: |
-          echo "${{ secrets.YC_SA_JSON_CREDENTIALS }}" > /tmp/sa-key.json
-          yc config set service-account-key /tmp/sa-key.json
+          # Проверяем, что JSON валидный
+          if ! echo "$YC_SA_JSON_CREDENTIALS" | jq empty 2>/dev/null; then
+            echo "ERROR: YC_SA_JSON_CREDENTIALS is not valid JSON"
+            echo "First 100 characters:"
+            echo "$YC_SA_JSON_CREDENTIALS" | cut -c1-100
+            exit 1
+          fi
+          
+          # Аутентифицируемся
+          echo "$YC_SA_JSON_CREDENTIALS" | yc config set service-account-key -
           yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
           yc config set cloud-id ${{ secrets.YC_CLOUD_ID }}
       
-      # 6. Получаем credentials для доступа к Kubernetes кластеру
       - name: Get Kubernetes cluster credentials
         run: |
           yc managed-kubernetes cluster get-credentials ${{ secrets.YC_K8S_CLUSTER_NAME }} \
             --folder-id ${{ secrets.YC_FOLDER_ID }} \
             --external
       
-      # 7. Устанавливаем kubectl
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
         with:
           version: 'latest'
       
-      # 8. Проверяем подключение к кластеру
       - name: Verify cluster connection
         run: |
           kubectl cluster-info
           kubectl get nodes
 
-      # 9. Применяем манифесты и перезапускаем поды
       - name: Deploy to Kubernetes
         run: |
           kubectl apply -f k8s/k8s.yaml
-          
           kubectl rollout restart deployment/web -n smartmeeting
           kubectl rollout restart deployment/celery-worker -n smartmeeting
           kubectl rollout restart deployment/celery-beat -n smartmeeting
@@ -79,4 +78,3 @@ jobs:
           kubectl rollout status deployment/celery-worker -n smartmeeting --timeout=120s
           kubectl rollout status deployment/celery-beat -n smartmeeting --timeout=120s
           
-          kubectl get pods -n smartmeeting
