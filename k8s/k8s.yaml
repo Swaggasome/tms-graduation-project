@@ -18,7 +18,7 @@ data:
   DJANGO_SETTINGS_MODULE: "smartmeeting.settings"
   PYTHONUNBUFFERED: "1"
   DJANGO_DEBUG: "False"
-  DJANGO_ALLOWED_HOSTS: "smartmeeting.galkin.online,smartmeeting.galkin.online"
+  DJANGO_ALLOWED_HOSTS: "smartmeeting.galkin.online, localhost, 127.0.0.1"
   EMAIL_BACKEND: "django.core.mail.backends.console.EmailBackend"
 
 ---
@@ -613,12 +613,11 @@ metadata:
   annotations:
     # Для nginx ingress controller
     kubernetes.io/ingress.class: "nginx"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/cluster-issuer: "letsencrypt-staging"
     # Опционально: для правильного определения реального IP
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
       proxy_set_header X-Forwarded-Proto $scheme;
-      proxy_set_header Host $host;
 spec:
   tls:
   - hosts:
