@@ -9,3 +9,7 @@
 ### Фреймворк для написания  приложения - Django
 
 terraform output -raw yc_sa_json_credentials_raw 
+kubectl get svc web -n smartmeeting
+kubectl -n smartmeeting exec -it <web pod name> -- python manage.py create_rooms
+kubectl -n smartmeeting exec -it <web pod name> -- python manage.py createsuperuser --username admin --email admin@example.com
+kubectl -n smartmeeting exec -it <web pod name> -- python manage.py setup_reminder_schedule
