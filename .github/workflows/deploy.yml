@@ -13,7 +13,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Login to Yandex CR
-        id: login-cr
         uses: yc-actions/yc-cr-login@v1
         with:
           yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
@@ -33,24 +32,30 @@ jobs:
         run: |
           curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
           echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
-      
+          
       - name: Authenticate yc CLI
-        env:
-          YC_SA_JSON_CREDENTIALS: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
         run: |
-          # Проверяем, что JSON валидный
-          if ! echo "$YC_SA_JSON_CREDENTIALS" | jq empty 2>/dev/null; then
-            echo "ERROR: YC_SA_JSON_CREDENTIALS is not valid JSON"
-            echo "First 100 characters:"
-            echo "$YC_SA_JSON_CREDENTIALS" | cut -c1-100
+          # Создаем файл с ключом, используя heredoc с кавычками
+          cat > /tmp/sa-key.json << 'EOF'
+          ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+          EOF
+          
+          # Проверяем, что файл создан и содержит валидный JSON
+          if ! jq . /tmp/sa-key.json > /dev/null 2>&1; then
+            echo "ERROR: Invalid JSON in YC_SA_JSON_CREDENTIALS"
+            echo "File content preview:"
+            head -c 200 /tmp/sa-key.json
             exit 1
           fi
           
-          # Аутентифицируемся
-          echo "$YC_SA_JSON_CREDENTIALS" | yc config set service-account-key -
+          # Настраиваем yc
+          yc config set service-account-key /tmp/sa-key.json
           yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
           yc config set cloud-id ${{ secrets.YC_CLOUD_ID }}
-      
+          
+          # Проверяем, какой аккаунт используется
+          yc config list
+          
       - name: Get Kubernetes cluster credentials
         run: |
           yc managed-kubernetes cluster get-credentials ${{ secrets.YC_K8S_CLUSTER_NAME }} \
@@ -62,11 +67,6 @@ jobs:
         with:
           version: 'latest'
       
-      - name: Verify cluster connection
-        run: |
-          kubectl cluster-info
-          kubectl get nodes
-
       - name: Deploy to Kubernetes
         run: |
           kubectl apply -f k8s/k8s.yaml
@@ -77,4 +77,3 @@ jobs:
           kubectl rollout status deployment/web -n smartmeeting --timeout=120s
           kubectl rollout status deployment/celery-worker -n smartmeeting --timeout=120s
           kubectl rollout status deployment/celery-beat -n smartmeeting --timeout=120s
-          
