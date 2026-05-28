@@ -43,9 +43,9 @@ jobs:
       - name: Configure kubectl
         run: |
           mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > $HOME/.kube/config
-        # Примечание: Если вы сохранили KUBE_CONFIG как обычный текст, команда будет:
-        # echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+          # echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > $HOME/.kube/config
+          # Примечание: Если вы сохранили KUBE_CONFIG как обычный текст, команда будет:
+          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
 
       # 6. Применяем манифесты и ОБЯЗАТЕЛЬНО перезапускаем поды
       - name: Deploy to Kubernetes
