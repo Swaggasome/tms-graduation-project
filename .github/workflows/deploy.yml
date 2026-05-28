@@ -1,0 +1,65 @@
+name: Deploy to Yandex Cloud Kubernetes
+
+on:
+  push:
+    branches: [ main ]  # Запуск при пуше в главную ветку
+  workflow_dispatch:    # Возможность запустить вручную из интерфейса GitHub
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Клонируем код вашего приложения
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Логинимся в Yandex Cloud Container Registry
+      - name: Login to Yandex CR
+        id: login-cr
+        uses: yc-actions/yc-cr-login@v1
+        with:
+          yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+
+      # 3. Собираем Docker-образ и пушим его в реестр
+      - name: Build, tag, and push image to Yandex CR
+        env:
+          CR_REGISTRY: ${{ secrets.CR_REGISTRY_ID }}
+          CR_REPOSITORY: ${{ secrets.CR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}  # Уникальный тег на основе SHA коммита
+        run: |
+          docker build -t cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$IMAGE_TAG .
+          docker push cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$IMAGE_TAG
+          # Также помечаем latest (опционально)
+          docker tag cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$IMAGE_TAG cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:latest
+          docker push cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:latest
+          
+      # 4. Устанавливаем kubectl
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest' # Или укажите конкретную версию, например '1.28.0'
+
+      # 5. Настраиваем доступ к кластеру
+      - name: Configure kubectl
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > $HOME/.kube/config
+        # Примечание: Если вы сохранили KUBE_CONFIG как обычный текст, команда будет:
+        # echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+
+      # 6. Применяем манифесты и ОБЯЗАТЕЛЬНО перезапускаем поды
+      - name: Deploy to Kubernetes
+        run: |
+          # Применяем все манифесты из вашего файла
+          kubectl apply -f k8s.yaml
+          
+          # КЛЮЧЕВОЙ МОМЕНТ: Перезапускаем deployment'ы, чтобы они подтянули новый образ
+          kubectl rollout restart deployment/web -n smartmeeting
+          kubectl rollout restart deployment/celery-worker -n smartmeeting
+          kubectl rollout restart deployment/celery-beat -n smartmeeting
+          
+          # Ожидаем завершения обновления, чтобы убедиться, что все прошло успешно
+          kubectl rollout status deployment/web -n smartmeeting --timeout=120s
+          kubectl rollout status deployment/celery-worker -n smartmeeting --timeout=120s
+          kubectl rollout status deployment/celery-beat -n smartmeeting --timeout=120s
+          
