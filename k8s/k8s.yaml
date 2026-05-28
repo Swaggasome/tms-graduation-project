@@ -280,7 +280,7 @@ spec:
     spec:
       initContainers:
       - name: run-migrations
-        image: cr.yandex/crpfo6p8bqq04ravvfvk/smartmeeting:latest
+        image: cr.yandex/crpf4khvh0ohsei6g2an/smartmeeting:latest
         imagePullPolicy: Always
         command: ['python', 'manage.py', 'migrate']
         env:
@@ -328,7 +328,7 @@ spec:
               key: DB_PASSWORD
       containers:
       - name: web
-        image: cr.yandex/crpfo6p8bqq04ravvfvk/smartmeeting:latest
+        image: cr.yandex/crpf4khvh0ohsei6g2an/smartmeeting:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
@@ -443,7 +443,7 @@ spec:
     spec:
       containers:
       - name: celery
-        image: cr.yandex/crpfo6p8bqq04ravvfvk/smartmeeting:latest
+        image: cr.yandex/crpf4khvh0ohsei6g2an/smartmeeting:latest
         imagePullPolicy: IfNotPresent
         command: ["celery", "-A", "smartmeeting", "worker", "-l", "info"]
         env:
@@ -530,7 +530,7 @@ spec:
     spec:
       containers:
       - name: celery-beat
-        image: cr.yandex/crpfo6p8bqq04ravvfvk/smartmeeting:latest
+        image: cr.yandex/crpf4khvh0ohsei6g2an/smartmeeting:latest
         imagePullPolicy: IfNotPresent
         command: ["celery", "-A", "smartmeeting", "beat", "-l", "info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
         env:
