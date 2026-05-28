@@ -403,12 +403,18 @@ spec:
           httpGet:
             path: /
             port: 8000
+            httpHeaders:
+            - name: Host
+              value: smartmeeting.galkin.online
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /
             port: 8000
+            httpHeaders:
+            - name: Host
+              value: smartmeeting.galkin.online
           initialDelaySeconds: 5
           periodSeconds: 5
 ---
