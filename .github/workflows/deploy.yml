@@ -2,14 +2,14 @@ name: Deploy to Yandex Cloud Kubernetes
 
 on:
   push:
-    branches: [ main ]  # Запуск при пуше в главную ветку
-  workflow_dispatch:    # Возможность запустить вручную из интерфейса GitHub
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      # 1. Клонируем код вашего приложения
+      # 1. Клонируем код
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -25,39 +25,61 @@ jobs:
         env:
           CR_REGISTRY: ${{ secrets.CR_REGISTRY_ID }}
           CR_REPOSITORY: ${{ secrets.CR_REPOSITORY }}
-          IMAGE_TAG: ${{ github.sha }}  # Уникальный тег на основе SHA коммита
+          IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$IMAGE_TAG .
           docker push cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$IMAGE_TAG
-          # Также помечаем latest (опционально)
           docker tag cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$IMAGE_TAG cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:latest
           docker push cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:latest
           
-      # 4. Устанавливаем kubectl
+      # 4. Устанавливаем yc CLI (Yandex Cloud CLI)
+      - name: Install yc CLI
+        uses: yc-actions/yc-install@v1
+        with:
+          yc-version: 'latest'
+      
+      # 5. Аутентифицируем yc CLI через JSON-ключ
+      - name: Authenticate yc CLI
+        run: |
+          echo "${{ secrets.YC_SA_JSON_CREDENTIALS }}" > /tmp/sa-key.json
+          yc config set service-account-key /tmp/sa-key.json
+          yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
+          yc config set cloud-id ${{ secrets.YC_CLOUD_ID }}
+      
+      # 6. Получаем credentials для доступа к Kubernetes кластеру
+      - name: Get Kubernetes cluster credentials
+        run: |
+          yc managed-kubernetes cluster get-credentials ${{ secrets.YC_K8S_CLUSTER_NAME }} \
+            --folder-id ${{ secrets.YC_FOLDER_ID }} \
+            --external
+      
+      # 7. Устанавливаем kubectl
       - name: Install kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: 'latest' # Или укажите конкретную версию, например '1.28.0'
-
-      # 5. Настраиваем доступ к кластеру
-      - name: Configure kubectl
+          version: 'latest'
+      
+      # 8. Проверяем подключение к кластеру (опционально, для отладки)
+      - name: Verify cluster connection
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > $HOME/.kube/config
+          kubectl cluster-info
+          kubectl get nodes
 
-      # 6. Применяем манифесты и ОБЯЗАТЕЛЬНО перезапускаем поды
+      # 9. Применяем манифесты и перезапускаем поды
       - name: Deploy to Kubernetes
         run: |
-          # Применяем все манифесты из вашего файла
+          # Применяем все манифесты
           kubectl apply -f k8s/k8s.yaml
           
-          # КЛЮЧЕВОЙ МОМЕНТ: Перезапускаем deployment'ы, чтобы они подтянули новый образ
+          # Перезапускаем deployment'ы, чтобы подтянуть новый образ
           kubectl rollout restart deployment/web -n smartmeeting
           kubectl rollout restart deployment/celery-worker -n smartmeeting
           kubectl rollout restart deployment/celery-beat -n smartmeeting
           
-          # Ожидаем завершения обновления, чтобы убедиться, что все прошло успешно
+          # Ожидаем завершения обновления
           kubectl rollout status deployment/web -n smartmeeting --timeout=120s
           kubectl rollout status deployment/celery-worker -n smartmeeting --timeout=120s
           kubectl rollout status deployment/celery-beat -n smartmeeting --timeout=120s
           
+          # Показываем статус подов (для отладки)
+          kubectl get pods -n smartmeeting
