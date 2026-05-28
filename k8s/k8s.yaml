@@ -18,7 +18,7 @@ data:
   DJANGO_SETTINGS_MODULE: "smartmeeting.settings"
   PYTHONUNBUFFERED: "1"
   DJANGO_DEBUG: "False"
-  DJANGO_ALLOWED_HOSTS: "smartmeeting.galkin.online, galkin.online"
+  DJANGO_ALLOWED_HOSTS: "10.112.129.27"
   EMAIL_BACKEND: "django.core.mail.backends.console.EmailBackend"
 
 ---
