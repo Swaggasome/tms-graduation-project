@@ -17,7 +17,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-ваш-клю�
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False')
 
 # ALLOWED_HOSTS - из переменных окружения
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(';')
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*')
 
 # Приложения
 INSTALLED_APPS = [
