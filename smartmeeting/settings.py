@@ -9,12 +9,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 AUTH_USER_MODEL = 'accounts.User'
 
-# Секретный ключ (в .env файл потом)
-SECRET_KEY = 'django-insecure-ваш-ключ-тут'
+# Секретный ключ - ОБЯЗАТЕЛЬНО из переменных окружения
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-ваш-ключ-тут')
+# В production никогда не используйте значение по умолчанию!
 
-DEBUG = True
+# Debug - из переменных окружения
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False')
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+# ALLOWED_HOSTS - из переменных окружения
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
 
 # Приложения
 INSTALLED_APPS = [
@@ -28,7 +31,7 @@ INSTALLED_APPS = [
     # Сторонние приложения
     'django_celery_beat',
 
-    # НАШИ ПРИЛОЖЕНИЯ - используем точечную нотацию
+    # НАШИ ПРИЛОЖЕНИЯ
     'apps.accounts',
     'apps.rooms',
     'apps.bookings',
@@ -65,25 +68,25 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'smartmeeting.wsgi.application'
 
-# База данных (PostgreSQL)
+# База данных - из переменных окружения
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        # 'NAME': BASE_DIR / 'db.sqlite3',
-        'NAME': 'smartmeeting',
-        'USER': 'postgres',
-        'PASSWORD': 'postgres',
-        'HOST': 'db',
-        'PORT': '5432',
+        'NAME': os.environ.get('DB_NAME', 'smartmeeting'),
+        'USER': os.environ.get('DB_USER', 'postgres'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
+        'HOST': os.environ.get('DB_HOST', 'postgres'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
     }
 }
 
-# Если хочешь начать с SQLite (попроще):
+# Альтернативный вариант через DATABASE_URL (рекомендуется)
+# import dj_database_url
 # DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
+#     'default': dj_database_url.config(
+#         default=os.environ.get('DATABASE_URL', 'postgres://postgres:postgres@postgres:5432/smartmeeting'),
+#         conn_max_age=600
+#     )
 # }
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -102,7 +105,7 @@ USE_TZ = True
 # Статика и медиа
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+# STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -117,13 +120,14 @@ CELERY_TIMEZONE = TIME_ZONE
 
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 
-# Email (для разработки - вывод в консоль)
-# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-# Для реальной отправки используй:
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+# Email
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND', 
+    'django.core.mail.backends.console.EmailBackend'
+)
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 
@@ -133,3 +137,8 @@ LOGOUT_REDIRECT_URL = '/'
 LOGIN_URL = '/accounts/login/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Health check endpoint (для Kubernetes probes)
+def health_check(request):
+    from django.http import JsonResponse
+    return JsonResponse({"status": "ok"})
