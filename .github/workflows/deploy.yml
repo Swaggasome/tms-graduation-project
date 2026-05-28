@@ -32,11 +32,12 @@ jobs:
           docker tag cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$IMAGE_TAG cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:latest
           docker push cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:latest
           
-      # 4. Устанавливаем yc CLI (Yandex Cloud CLI)
+      # 4. Устанавливаем yc CLI (альтернативный способ)
       - name: Install yc CLI
-        uses: yc-actions/yc-install@v1
-        with:
-          yc-version: 'latest'
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+          echo "YC_INSTALL_DIR=$HOME/yandex-cloud" >> $GITHUB_ENV
       
       # 5. Аутентифицируем yc CLI через JSON-ключ
       - name: Authenticate yc CLI
@@ -59,7 +60,7 @@ jobs:
         with:
           version: 'latest'
       
-      # 8. Проверяем подключение к кластеру (опционально, для отладки)
+      # 8. Проверяем подключение к кластеру
       - name: Verify cluster connection
         run: |
           kubectl cluster-info
@@ -68,18 +69,14 @@ jobs:
       # 9. Применяем манифесты и перезапускаем поды
       - name: Deploy to Kubernetes
         run: |
-          # Применяем все манифесты
           kubectl apply -f k8s/k8s.yaml
           
-          # Перезапускаем deployment'ы, чтобы подтянуть новый образ
           kubectl rollout restart deployment/web -n smartmeeting
           kubectl rollout restart deployment/celery-worker -n smartmeeting
           kubectl rollout restart deployment/celery-beat -n smartmeeting
           
-          # Ожидаем завершения обновления
           kubectl rollout status deployment/web -n smartmeeting --timeout=120s
           kubectl rollout status deployment/celery-worker -n smartmeeting --timeout=120s
           kubectl rollout status deployment/celery-beat -n smartmeeting --timeout=120s
           
-          # Показываем статус подов (для отладки)
           kubectl get pods -n smartmeeting
