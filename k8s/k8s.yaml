@@ -18,7 +18,7 @@ data:
   DJANGO_SETTINGS_MODULE: "smartmeeting.settings"
   PYTHONUNBUFFERED: "1"
   DJANGO_DEBUG: "False"
-  DJANGO_ALLOWED_HOSTS: "*"
+  DJANGO_ALLOWED_HOSTS: "smartmeeting.galkin.online"
   EMAIL_BACKEND: "django.core.mail.backends.console.EmailBackend"
 
 ---
@@ -598,3 +598,50 @@ spec:
           limits:
             memory: "128Mi"
             cpu: "100m"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: smartmeeting-ingress
+  namespace: smartmeeting
+  annotations:
+    # Для nginx ingress controller
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # Опционально: для правильного определения реального IP
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+      proxy_set_header Host $host;
+spec:
+  tls:
+  - hosts:
+    - smartmeeting.galkin.online
+    secretName: smartmeeting-tls
+  rules:
+  - host: smartmeeting.galkin.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web
+            port:
+              number: 8000
+---
+# Для тестовой среды (staging)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    email: v.g.galkin@gmail.com
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-private-key
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
