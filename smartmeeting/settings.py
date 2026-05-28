@@ -17,8 +17,8 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-ваш-клю�
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False')
 
 # ALLOWED_HOSTS - из переменных окружения
-ALLOWED_HOSTS = [os.environ.get('DJANGO_ALLOWED_HOSTS', '*')]
-
+# ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = ["smartmeeting.galkin.online,smartmeeting.galkin.online", "martmeeting.galkin.online"]
 # Приложения
 INSTALLED_APPS = [
     'django.contrib.admin',
