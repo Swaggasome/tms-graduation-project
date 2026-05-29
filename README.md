@@ -45,7 +45,7 @@ kubectl apply -f k8s/deployment.yaml
 ```
 kubectl get pods -n smartmeeting
 ```
-7. Доставем IP адрес ingress-nginx LoadBalancer
+7. Достаем IP адрес ingress-nginx LoadBalancer
 ```
 kubectl get svc ingress-nginx -n ingress-nginx
 ```
@@ -59,6 +59,6 @@ kubectl get svc ingress-nginx -n ingress-nginx
 ```
 kubectl get pods -n smartmeeting
 kubectl -n smartmeeting exec -it <web pod name> -- python manage.py create_rooms
-kubectl -n smartmeeting exec -it <web pod name> -- python manage.py createsuperuser --username admin --email admin@example.com
 kubectl -n smartmeeting exec -it <web pod name> -- python manage.py setup_reminder_schedule
+kubectl -n smartmeeting exec -it <web pod name> -- python manage.py createsuperuser
 ```
