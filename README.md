@@ -9,6 +9,7 @@
 ### Фреймворк для написания  приложения - Django
 
 ## Инструкция по первичному развертыванию приложения
+### IAC - Terraform в репазитории [text](https://github.com/Swaggasome/tms-graduation-project-infra.git)
 1. Достаем ключ json для GitHub push registry 
 ```
 terraform output -raw yc_sa_json_credentials_raw > key.json
@@ -62,3 +63,6 @@ kubectl -n smartmeeting exec -it <web pod name> -- python manage.py create_rooms
 kubectl -n smartmeeting exec -it <web pod name> -- python manage.py setup_reminder_schedule
 kubectl -n smartmeeting exec -it <web pod name> -- python manage.py createsuperuser
 ```
+
+ToDo: Убрать секреты из k8s/k8s.yaml создавать секреты вручную до развертывания приложения
+ToDo: Дополнить CI/CD workfow 
