@@ -643,14 +643,14 @@ spec:
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
-  name: letsencrypt-prod
+  name: letsencrypt-staging
 spec:
   acme:
     # Email для уведомлений о проблемах с сертификатами
     email: v.g.galkin@gmail.com # Замените на ваш email
     server: https://acme-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
-      name: letsencrypt-prod-private-key
+      name: letsencrypt-staging-private-key
     solvers:
     - http01:
         ingress:
