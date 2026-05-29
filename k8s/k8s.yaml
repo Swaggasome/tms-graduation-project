@@ -617,7 +617,7 @@ metadata:
   annotations:
     # Для nginx ingress controller
     kubernetes.io/ingress.class: "nginx"
-    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
     # Опционально: для правильного определения реального IP
     nginx.ingress.kubernetes.io/proxy-set-header: |
       "X-Forwarded-For $proxy_add_x_forwarded_for";
