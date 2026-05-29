@@ -20,6 +20,9 @@ data:
   DJANGO_DEBUG: "False"
   DJANGO_ALLOWED_HOSTS: "smartmeeting.galkin.online, localhost, 127.0.0.1"
   EMAIL_BACKEND: "django.core.mail.backends.console.EmailBackend"
+  DJANGO_CSRF_TRUSTED_ORIGINS: "https://smartmeeting.galkin.online,http://smartmeeting.galkin.online"
+  DJANGO_CSRF_COOKIE_SECURE: "True"
+  DJANGO_SESSION_COOKIE_SECURE: "True"
 
 ---
 # Используем stringData вместо data
@@ -280,7 +283,7 @@ spec:
     spec:
       initContainers:
       - name: run-migrations
-        image: cr.yandex/crpf4khvh0ohsei6g2an/smartmeeting:latest
+        image: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:latest
         imagePullPolicy: Always
         command: ['python', 'manage.py', 'migrate']
         env:
@@ -328,7 +331,7 @@ spec:
               key: DB_PASSWORD
       containers:
       - name: web
-        image: cr.yandex/crpf4khvh0ohsei6g2an/smartmeeting:latest
+        image: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
@@ -417,19 +420,19 @@ spec:
               value: smartmeeting.galkin.online
           initialDelaySeconds: 5
           periodSeconds: 5
-# ---
-# apiVersion: v1
-# kind: Service
-# metadata:
-#   name: web
-#   namespace: smartmeeting
-# spec:
-#   selector:
-#     app: web
-#   ports:
-#   - port: 8000
-#     targetPort: 8000
-#   type: LoadBalancer  # Или NodePort
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: smartmeeting
+spec:
+  selector:
+    app: web
+  ports:
+  - port: 8000
+    targetPort: 8000
+  type: NodePort  # Или  LoadBalancer
 ---
 # celery-deployment.yaml
 apiVersion: apps/v1
@@ -449,7 +452,7 @@ spec:
     spec:
       containers:
       - name: celery
-        image: cr.yandex/crpf4khvh0ohsei6g2an/smartmeeting:latest
+        image: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:latest
         imagePullPolicy: IfNotPresent
         command: ["celery", "-A", "smartmeeting", "worker", "-l", "info"]
         env:
@@ -536,7 +539,7 @@ spec:
     spec:
       containers:
       - name: celery-beat
-        image: cr.yandex/crpf4khvh0ohsei6g2an/smartmeeting:latest
+        image: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:latest
         imagePullPolicy: IfNotPresent
         command: ["celery", "-A", "smartmeeting", "beat", "-l", "info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
         env:
@@ -605,6 +608,7 @@ spec:
             memory: "128Mi"
             cpu: "100m"
 ---
+# Ingress ресурс с поддержкой TLS
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -613,18 +617,18 @@ metadata:
   annotations:
     # Для nginx ingress controller
     kubernetes.io/ingress.class: "nginx"
-    cert-manager.io/cluster-issuer: "letsencrypt-staging"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
     # Опционально: для правильного определения реального IP
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-      proxy_set_header X-Forwarded-Proto $scheme;
+    nginx.ingress.kubernetes.io/proxy-set-header: |
+      "X-Forwarded-For $proxy_add_x_forwarded_for";
+      "X-Forwarded-Proto $scheme";
 spec:
   tls:
   - hosts:
-    - smartmeeting.galkin.online
+    - smartmeeting.galkin.online # Замените на ваш домен
     secretName: smartmeeting-tls
   rules:
-  - host: smartmeeting.galkin.online
+  - host: smartmeeting.galkin.online # Замените на ваш домен
     http:
       paths:
       - path: /
@@ -635,6 +639,31 @@ spec:
             port:
               number: 8000
 ---
+# ClusterIssuer для Let's Encrypt (Production)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    # Email для уведомлений о проблемах с сертификатами
+    email: v.g.galkin@gmail.com # Замените на ваш email
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-private-key
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+      # Опционально: добавьте DNS challenge если нужно
+      # dns01:
+      #   cloudflare:
+      #     email: your-email@example.com
+      #     apiTokenSecretRef:
+      #       name: cloudflare-api-token
+      #       key: api-token
+
+---
 # Для тестовой среды (staging)
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -642,7 +671,7 @@ metadata:
   name: letsencrypt-staging
 spec:
   acme:
-    email: v.g.galkin@gmail.com
+    email: v.g.galkin@gmail.com # Замените на ваш email
     server: https://acme-staging-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: letsencrypt-staging-private-key

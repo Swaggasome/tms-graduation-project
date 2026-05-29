@@ -19,6 +19,21 @@ DEBUG = os.environ.get('DJANGO_DEBUG', 'False')
 # ALLOWED_HOSTS - из переменных окружения
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
 
+SRF_TRUSTED_ORIGINS = os.getenv('DJANGO_CSRF_TRUSTED_ORIGINS', '').split(',')
+
+# Удаляем пустые строки
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in CSRF_TRUSTED_ORIGINS if origin.strip()]
+
+# Если список пустой, можно установить значение по умолчанию
+if not CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS = ['https://smartmeeting.galkin.online']
+
+# CSRF cookie настройки
+CSRF_COOKIE_SECURE = os.getenv('DJANGO_CSRF_COOKIE_SECURE', 'False') == 'True'
+SESSION_COOKIE_SECURE = os.getenv('DJANGO_SESSION_COOKIE_SECURE', 'False') == 'True'
+CSRF_COOKIE_HTTPONLY = False  # Важно для работы с JavaScript
+CSRF_USE_SESSIONS = False  # Хранить CSRF токен в cookie, а не в сессии
+
 # Приложения
 INSTALLED_APPS = [
     'django.contrib.admin',
