@@ -9,7 +9,7 @@
 ### Фреймворк для написания  приложения - Django
 
 ## Инструкция по первичному развертыванию приложения
-### IAC - Terraform в репазитории [text](https://github.com/Swaggasome/tms-graduation-project-infra.git)
+### IAC - Terraform в репазитории [TMS GUARDIAN PROJECT INFRA](https://github.com/Swaggasome/tms-graduation-project-infra.git)
 1. Достаем ключ json для GitHub push registry 
 ```
 terraform output -raw yc_sa_json_credentials_raw > key.json
