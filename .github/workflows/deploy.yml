@@ -60,10 +60,10 @@ jobs:
       - name: Create .env.secret from GitHub Secrets
         run: |
           cat > k8s/.env.secret << 'EOF'
-          DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+          DB_USER=${{ secrets.DB_USER }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          DB_DATABASE=${{ secrets.DB_DATABASE }}
+          DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
           EOF
           
           # Проверяем, что файл создан (без вывода содержимого)
