@@ -6,18 +6,22 @@ resources:
 
 namespace: smartmeeting-staging
 
-replicas:
-- name: web
-  count: 2
-- name: celery-worker
-  count: 1
-- name: celery-beat
-  count: 1
+# secretGenerator для создания секрета из файла
+secretGenerator:
+- name: secrets-project
+  envs:
+  - .env.secret
+  type: Opaque
+  options:
+    disableNameSuffixHash: true
 
+# Патчи для изменения конфигурации
 patchesStrategicMerge:
-  - configmap-patch.yaml
-  - ingress-patch.yaml
+  - patches/deployment-web.yaml
+  - patches/deployment-worker.yaml
+  - patches/configmap.yaml
 
+# Замена образов
 images:
 - name: cr.yandex/crpfasovola9dqldhpk4/smartmeeting
   newTag: staging-latest

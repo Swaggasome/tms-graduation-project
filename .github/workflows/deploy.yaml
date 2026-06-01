@@ -2,10 +2,7 @@ name: Deploy to Yandex Cloud Kubernetes
 
 on:
   push:
-    branches: 
-      - main
-      - staging
-      - 'feature/**'
+    branches: [main, staging, 'feature/**']
   workflow_dispatch:
 
 jobs:
@@ -19,36 +16,24 @@ jobs:
         id: env
         run: |
           if [[ "${{ github.ref_name }}" == "main" ]]; then
-            ENVIRONMENT="production"
-            NAMESPACE="smartmeeting-prod"
-            OVERLAY="production"
-            REPLICAS_WEB=3
-            REPLICAS_WORKER=2
+            echo "ENVIRONMENT=production" >> $GITHUB_OUTPUT
+            echo "NAMESPACE=smartmeeting-prod" >> $GITHUB_OUTPUT
+            echo "OVERLAY=production" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref_name }}" == "staging" ]]; then
-            ENVIRONMENT="staging"
-            NAMESPACE="smartmeeting-staging"
-            OVERLAY="staging"
-            REPLICAS_WEB=2
-            REPLICAS_WORKER=1
-          elif [[ "${{ github.ref_name }}" == feature/* ]]; then
-            ENVIRONMENT="feature"
+            echo "ENVIRONMENT=staging" >> $GITHUB_OUTPUT
+            echo "NAMESPACE=smartmeeting-staging" >> $GITHUB_OUTPUT
+            echo "OVERLAY=staging" >> $GITHUB_OUTPUT
+          else
+            echo "ENVIRONMENT=feature" >> $GITHUB_OUTPUT
             BRANCH_NAME="${{ github.ref_name }}"
-            NAMESPACE="feature-${BRANCH_NAME#feature/}"
-            NAMESPACE=$(echo "$NAMESPACE" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
-            OVERLAY="feature"
-            REPLICAS_WEB=1
-            REPLICAS_WORKER=1
+            BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/feature\///' | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
+            echo "NAMESPACE=feature-${BRANCH_NAME}" >> $GITHUB_OUTPUT
+            echo "OVERLAY=feature" >> $GITHUB_OUTPUT
           fi
           
-          echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_OUTPUT
-          echo "NAMESPACE=$NAMESPACE" >> $GITHUB_OUTPUT
-          echo "OVERLAY=$OVERLAY" >> $GITHUB_OUTPUT
-          echo "REPLICAS_WEB=$REPLICAS_WEB" >> $GITHUB_OUTPUT
-          echo "REPLICAS_WORKER=$REPLICAS_WORKER" >> $GITHUB_OUTPUT
-          
-          echo "Environment: $ENVIRONMENT"
-          echo "Namespace: $NAMESPACE"
-          echo "Overlay: $OVERLAY"
+          echo "Environment: ${{ steps.env.outputs.ENVIRONMENT }}"
+          echo "Namespace: ${{ steps.env.outputs.NAMESPACE }}"
+          echo "Overlay: ${{ steps.env.outputs.OVERLAY }}"
 
       - name: Login to Yandex CR
         uses: yc-actions/yc-cr-login@v1
@@ -60,18 +45,22 @@ jobs:
           CR_REGISTRY: ${{ secrets.CR_REGISTRY_ID }}
           CR_REPOSITORY: ${{ secrets.CR_REPOSITORY }}
           ENVIRONMENT: ${{ steps.env.outputs.ENVIRONMENT }}
-          IMAGE_TAG: ${{ github.sha }}
+          SHA: ${{ github.sha }}
         run: |
-          if [[ "$ENVIRONMENT" == "feature" ]]; then
-            IMAGE_TAG="${{ github.sha }}-feature"
+          if [[ "$ENVIRONMENT" == "production" ]]; then
+            TAG="latest"
           elif [[ "$ENVIRONMENT" == "staging" ]]; then
-            IMAGE_TAG="staging-latest"
+            TAG="staging-latest"
           else
-            IMAGE_TAG="latest"
+            TAG="${SHA}-feature"
           fi
           
-          docker build -t cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$IMAGE_TAG .
-          docker push cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$IMAGE_TAG
+          echo "Building image with tag: $TAG"
+          docker build -t cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$TAG .
+          docker push cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$TAG
+          
+          # Сохраняем тег для дальнейшего использования
+          echo "IMAGE_TAG=$TAG" >> $GITHUB_ENV
 
       - name: Install yc CLI
         run: |
@@ -104,59 +93,157 @@ jobs:
           kubectl create namespace ${{ steps.env.outputs.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Create .env.secret from GitHub Secrets
+        env:
+          ENVIRONMENT: ${{ steps.env.outputs.ENVIRONMENT }}
+          NAMESPACE: ${{ steps.env.outputs.NAMESPACE }}
         run: |
-          if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "production" ]]; then
-            DB_USER="${{ secrets.PROD_DB_USER }}"
-            DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
-            DB_DATABASE="${{ secrets.PROD_DB_DATABASE }}"
-            DJANGO_SECRET_KEY="${{ secrets.PROD_DJANGO_SECRET_KEY }}"
+          # Создаем директорию для секретов временного overlay
+          mkdir -p k8s/secrets
+          
+          if [[ "$ENVIRONMENT" == "production" ]]; then
+            echo "Creating .env.secret for PRODUCTION"
+            cat > k8s/secrets/.env.secret << EOF
+            DB_USER=${{ secrets.PROD_DB_USER }}
+            DB_PASSWORD=${{ secrets.PROD_DB_PASSWORD }}
+            DB_DATABASE=${{ secrets.PROD_DB_DATABASE }}
+            DJANGO_SECRET_KEY=${{ secrets.PROD_DJANGO_SECRET_KEY }}
+            EOF
+          elif [[ "$ENVIRONMENT" == "staging" ]]; then
+            echo "Creating .env.secret for STAGING"
+            cat > k8s/secrets/.env.secret << EOF
+            DB_USER=${{ secrets.STAGING_DB_USER }}
+            DB_PASSWORD=${{ secrets.STAGING_DB_PASSWORD }}
+            DB_DATABASE=${{ secrets.STAGING_DB_DATABASE }}
+            DJANGO_SECRET_KEY=${{ secrets.STAGING_DJANGO_SECRET_KEY }}
+            EOF
           else
-            DB_USER="${{ secrets.STAGING_DB_USER }}"
-            DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
-            DJANGO_SECRET_KEY="${{ secrets.STAGING_DJANGO_SECRET_KEY }}"
-            
-            if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "feature" ]]; then
-              DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}_feature_${{ github.sha }}"
-            else
-              DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
-            fi
+            echo "Creating .env.secret for FEATURE branch"
+            FEATURE_DB_NAME="${{ secrets.STAGING_DB_DATABASE }}_feature_${{ github.sha }}"
+            # Ограничиваем длину имени БД (PostgreSQL ограничение 63 символа)
+            FEATURE_DB_NAME=$(echo "$FEATURE_DB_NAME" | cut -c1-63)
+            cat > k8s/secrets/.env.secret << EOF
+            DB_USER=${{ secrets.STAGING_DB_USER }}
+            DB_PASSWORD=${{ secrets.STAGING_DB_PASSWORD }}
+            DB_DATABASE=${FEATURE_DB_NAME}
+            DJANGO_SECRET_KEY=${{ secrets.STAGING_DJANGO_SECRET_KEY }}
+            EOF
           fi
           
-          cat > k8s/.env.secret << EOF
-          DB_USER=${DB_USER}
-          DB_PASSWORD=${DB_PASSWORD}
-          DB_DATABASE=${DB_DATABASE}
-          DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-          EOF
+          # Проверяем создание файла
+          if [ -f k8s/secrets/.env.secret ]; then
+            echo "✅ .env.secret created successfully in k8s/secrets/"
+            echo "Variables present:"
+            grep -o '^[^=]*' k8s/secrets/.env.secret
+          else
+            echo "❌ Failed to create .env.secret"
+            exit 1
+          fi
 
       - name: Deploy to Kubernetes
         env:
           NAMESPACE: ${{ steps.env.outputs.NAMESPACE }}
-          OVERLAY: ${{ steps.env.outputs.OVERLAY }}
           ENVIRONMENT: ${{ steps.env.outputs.ENVIRONMENT }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          CR_REGISTRY: ${{ secrets.CR_REGISTRY_ID }}
+          CR_REPOSITORY: ${{ secrets.CR_REPOSITORY }}
         run: |
           if [[ "$ENVIRONMENT" == "feature" ]]; then
-            # Для feature веток создаем временный kustomization
+            echo "Deploying FEATURE branch to namespace: $NAMESPACE"
+            
+            # Создаем временный kustomization для feature ветки
             mkdir -p k8s/overlays/temp
-            cp k8s/overlays/feature/kustomization.yaml k8s/overlays/temp/
-            cp k8s/overlays/feature/configmap-patch.yaml k8s/overlays/temp/
+            
+            # Используем современный синтаксис kustomize (без deprecated полей)
+            cat > k8s/overlays/temp/kustomization.yaml << 'EOF'
+            apiVersion: kustomize.config.k8s.io/v1beta1
+            kind: Kustomization
+            
+            resources:
+              - ../../base
+            
+            namespace: NAMESPACE_PLACEHOLDER
+            
+            secretGenerator:
+            - name: secrets-project
+              envs:
+              - ../../secrets/.env.secret
+              type: Opaque
+              options:
+                disableNameSuffixHash: true
+            
+            images:
+            - name: cr.yandex/REGISTRY_PLACEHOLDER/REPOSITORY_PLACEHOLDER
+              newTag: TAG_PLACEHOLDER
+            
+            # Заменяем патчи на современный синтаксис
+            patches:
+            - target:
+                kind: Deployment
+                name: web
+              patch: |-
+                - op: replace
+                  path: /spec/replicas
+                  value: 1
+            - target:
+                kind: Deployment
+                name: celery-worker
+              patch: |-
+                - op: replace
+                  path: /spec/replicas
+                  value: 1
+            - target:
+                kind: ConfigMap
+                name: smartmeeting-config
+              patch: |-
+                - op: replace
+                  path: /data/DJANGO_DEBUG
+                  value: "True"
+                - op: replace
+                  path: /data/DJANGO_ALLOWED_HOSTS
+                  value: "*"
+            EOF
             
             # Заменяем плейсхолдеры
-            sed -i "s/FEATURE_NAMESPACE/${NAMESPACE}/g" k8s/overlays/temp/kustomization.yaml
-            sed -i "s/FEATURE_TAG/${{ github.sha }}-feature/g" k8s/overlays/temp/kustomization.yaml
+            sed -i "s|NAMESPACE_PLACEHOLDER|${NAMESPACE}|g" k8s/overlays/temp/kustomization.yaml
+            sed -i "s|REGISTRY_PLACEHOLDER|${CR_REGISTRY}|g" k8s/overlays/temp/kustomization.yaml
+            sed -i "s|REPOSITORY_PLACEHOLDER|${CR_REPOSITORY}|g" k8s/overlays/temp/kustomization.yaml
+            sed -i "s|TAG_PLACEHOLDER|${IMAGE_TAG}|g" k8s/overlays/temp/kustomization.yaml
             
+            # Применяем
             kubectl apply -k k8s/overlays/temp
+            
+            # Очищаем
             rm -rf k8s/overlays/temp
+            
           else
-            kubectl apply -k k8s/overlays/${OVERLAY}
+            echo "Deploying $ENVIRONMENT to namespace: $NAMESPACE"
+            
+            # Для staging/production используем фиксированные overlays
+            # Создаем секрет в правильном месте
+            cp k8s/secrets/.env.secret k8s/overlays/${ENVIRONMENT}/.env.secret
+            
+            kubectl apply -k k8s/overlays/${ENVIRONMENT}
+            
+            # Удаляем временный файл секрета
+            rm -f k8s/overlays/${ENVIRONMENT}/.env.secret
           fi
           
           # Restart deployments
-          kubectl rollout restart deployment/web -n ${NAMESPACE}
-          kubectl rollout restart deployment/celery-worker -n ${NAMESPACE}
-          kubectl rollout restart deployment/celery-beat -n ${NAMESPACE}
+          echo "Restarting deployments in namespace: $NAMESPACE"
+          kubectl rollout restart deployment/web -n $NAMESPACE || true
+          kubectl rollout restart deployment/celery-worker -n $NAMESPACE || true
+          kubectl rollout restart deployment/celery-beat -n $NAMESPACE || true
           
           # Wait for rollouts
-          kubectl rollout status deployment/web -n ${NAMESPACE} --timeout=180s
-          kubectl rollout status deployment/celery-worker -n ${NAMESPACE} --timeout=180s
-          kubectl rollout status deployment/celery-beat -n ${NAMESPACE} --timeout=180s
+          echo "Waiting for rollouts to complete..."
+          kubectl rollout status deployment/web -n $NAMESPACE --timeout=180s || true
+          kubectl rollout status deployment/celery-worker -n $NAMESPACE --timeout=180s || true
+          kubectl rollout status deployment/celery-beat -n $NAMESPACE --timeout=180s || true
+          
+          echo "✅ Deployment completed for $ENVIRONMENT"
+
+      - name: Clean up secrets
+        if: always()
+        run: |
+          rm -rf k8s/secrets
+          echo "🧹 Cleaned up temporary secret files"

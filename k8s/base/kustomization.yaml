@@ -10,19 +10,7 @@ resources:
   - celery.yaml
   - ingress.yaml
 
-secretGenerator:
-- name: secrets-project
-  envs:
-  - .env.secret
-  type: Opaque
-  options:
-    disableNameSuffixHash: true  # Чтобы имя секрета не менялось
-
-# Общие метки для всех ресурсов
+# Простые метки без лишних опций
 commonLabels:
   app: smartmeeting
   managed-by: kustomize
-
-# Общие аннотации
-commonAnnotations:
-  organization: smartmeeting

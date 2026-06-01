@@ -6,29 +6,19 @@ resources:
 
 namespace: smartmeeting-prod
 
-# Изменяем количество реплик
-replicas:
-- name: web
-  count: 3
-- name: celery-worker
-  count: 2
-- name: celery-beat
-  count: 1
+secretGenerator:
+- name: secrets-project
+  envs:
+  - .env.secret
+  type: Opaque
+  options:
+    disableNameSuffixHash: true
 
-# Патчи для конфигурации
 patchesStrategicMerge:
-  - configmap-patch.yaml
-  - ingress-patch.yaml
-
-# Изменяем тип сервиса на LoadBalancer
-patches:
-- target:
-    kind: Service
-    name: web
-  patch: |
-    - op: replace
-      path: /spec/type
-      value: LoadBalancer
+  - patches/deployment-web.yaml
+  - patches/deployment-worker.yaml
+  - patches/service-web.yaml
+  - patches/configmap.yaml
 
 images:
 - name: cr.yandex/crpfasovola9dqldhpk4/smartmeeting
