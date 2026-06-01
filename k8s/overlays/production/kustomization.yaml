@@ -14,11 +14,33 @@ secretGenerator:
   options:
     disableNameSuffixHash: true
 
-patchesStrategicMerge:
-  - patches/deployment-web.yaml
-  - patches/deployment-worker.yaml
-  - patches/service-web.yaml
-  - patches/configmap.yaml
+patches:
+- target:
+    kind: Deployment
+    name: web
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 3
+    - op: replace
+      path: /spec/template/spec/containers/0/image
+      value: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:latest
+
+- target:
+    kind: Deployment
+    name: celery-worker
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 2
+
+- target:
+    kind: Service
+    name: web
+  patch: |-
+    - op: replace
+      path: /spec/type
+      value: LoadBalancer
 
 images:
 - name: cr.yandex/crpfasovola9dqldhpk4/smartmeeting
