@@ -19,9 +19,10 @@ secretGenerator:
     disableNameSuffixHash: true  # Чтобы имя секрета не менялось
 
 # Общие метки для всех ресурсов
-commonLabels:
-  app: smartmeeting
-  managed-by: kustomize
+labels:
+  - pairs:
+      app: smartmeeting
+      managed-by: kustomize
 
 # Общие аннотации
 commonAnnotations:
