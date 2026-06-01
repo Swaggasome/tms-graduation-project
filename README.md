@@ -47,7 +47,7 @@ DJANGO_SECRET_KEY='<DJANGO SECRET KEY>'
 ````
 6. Установаем наше приложение в кластер
 ```
-kubectl apply -f k8s/.
+kubectl apply -k k8s/.
 ```
 7. Проверяем статус приложения в кластере
 ```
