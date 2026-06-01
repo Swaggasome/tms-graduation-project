@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: smartmeeting-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-set-header: |
+      "X-Forwarded-For $proxy_add_x_forwarded_for";
+      "X-Forwarded-Proto $scheme";
+spec:
+  tls:
+  - hosts:
+    - smartmeeting.galkin.online
+    secretName: smartmeeting-tls
+  rules:
+  - host: smartmeeting.galkin.online
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web
+            port:
+              number: 8000

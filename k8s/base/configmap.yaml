@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smartmeeting-config
+data:
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  REDIS_URL: "redis://redis:6379/0"
+  DJANGO_SETTINGS_MODULE: "smartmeeting.settings"
+  PYTHONUNBUFFERED: "1"
+  DJANGO_DEBUG: "False"
+  EMAIL_BACKEND: "django.core.mail.backends.console.EmailBackend"
+  DJANGO_CSRF_COOKIE_SECURE: "True"
+  DJANGO_SESSION_COOKIE_SECURE: "True"
+  # Базовые настройки (будут переопределены в overlays)
+  DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+  DJANGO_CSRF_TRUSTED_ORIGINS: "http://localhost"

@@ -153,7 +153,3 @@ LOGIN_URL = '/accounts/login/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Health check endpoint (для Kubernetes probes)
-def health_check(request):
-    from django.http import JsonResponse
-    return JsonResponse({"status": "ok"})

@@ -5,6 +5,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from apps.bookings.views import home_view, calendar_view, get_events_api
 from apps.accounts.views import register
+from smartmeeting.views import health_check
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -17,6 +18,9 @@ urlpatterns = [
     path('calendar/', include('apps.bookings.urls')),
     path('api/events/', get_events_api, name='api_events'),
     path('register/', register, name='register'),
+
+    # Health check for Kubernetes liveness/readiness probes
+    path('health/', health_check, name='health_check'),
 ]
 
 if settings.DEBUG:
