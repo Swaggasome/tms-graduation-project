@@ -9,6 +9,4 @@ echo "Установка NGINX Ingress Controller..."
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
 
 echo "Готово! Компоненты устанавливаются в фоне."
-echo "Проверьте статус компонентов с помощью команд: 
-kubectl get pods -n ingress-nginx 
-kubectl get pods --namespace cert-manager
+echo "Проверьте статус компонентов с помощью команд: 'kubectl get pods -n ingress-nginx' и 'kubectl get pods -n cert-manager'"

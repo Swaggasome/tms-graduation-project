@@ -56,6 +56,22 @@ jobs:
         uses: azure/setup-kubectl@v3
         with:
           version: 'latest'
+
+      - name: Create .env.secret from GitHub Secrets
+        run: |
+          cat > k8s/.env.secret << 'EOF'
+          DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+          EOF
+          
+          # Проверяем, что файл создан (без вывода содержимого)
+          if [ ! -f k8s/.env.secret ]; then
+            echo "❌ .env.secret not created"
+            exit 1
+          fi
+          echo "✅ .env.secret created successfully"
       
       - name: Deploy to Kubernetes
         run: |
