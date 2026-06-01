@@ -71,5 +71,4 @@ kubectl -n smartmeeting exec -it <web pod name> -- python manage.py setup_remind
 kubectl -n smartmeeting exec -it <web pod name> -- python manage.py createsuperuser
 ```
 
-ToDo: Убрать секреты из k8s/k8s.yaml создавать секреты вручную до развертывания приложения
 ToDo: Дополнить CI/CD workfow 
