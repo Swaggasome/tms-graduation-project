@@ -22,6 +22,10 @@ xclip -selection clipboard < key.json
   - YC_CLOUD_ID - id Облака
   - YC_FOLDER_ID - id Папки
   - YC_K8S_CLUSTER_NAME - имя кластера
+  - DB_USER - пользователь базы данных
+  - DB_PASSWORD - пароль базы данных
+  - DB_DATABASE - имя базы данных
+  - DJANGO_SECRET_KEY - секретный ключ django
   
 3. собираем образ приложения и загружаем его в Реестр контейнеров
 ```

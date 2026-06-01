@@ -227,7 +227,7 @@ metadata:
   name: web
   namespace: smartmeeting
 spec:
-  replicas: 2
+  replicas: 3
   selector:
     matchLabels:
       app: web
