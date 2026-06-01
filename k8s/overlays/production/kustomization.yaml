@@ -6,14 +6,6 @@ resources:
 
 namespace: smartmeeting-prod
 
-secretGenerator:
-- name: secrets-project
-  envs:
-  - .env.secret
-  type: Opaque
-  options:
-    disableNameSuffixHash: true
-
 patches:
 - target:
     kind: Deployment

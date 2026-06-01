@@ -6,15 +6,6 @@ resources:
 
 namespace: smartmeeting-staging
 
-# secretGenerator для создания секрета из файла
-secretGenerator:
-- name: secrets-project
-  envs:
-  - .env.secret
-  type: Opaque
-  options:
-    disableNameSuffixHash: true
-
 # Патчи для изменения конфигурации
 patchesStrategicMerge:
   - patches/deployment-web.yaml

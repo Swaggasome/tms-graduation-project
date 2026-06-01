@@ -122,7 +122,7 @@ jobs:
             fi
           fi
           
-          cat > k8s/${{ steps.env.outputs.ENVIRONMENT }}/.env.secret << EOF
+          cat > k8s/base/.env.secret << EOF
           DB_USER=${DB_USER}
           DB_PASSWORD=${DB_PASSWORD}
           DB_DATABASE=${DB_DATABASE}
