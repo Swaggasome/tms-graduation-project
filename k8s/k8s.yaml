@@ -10,8 +10,6 @@ metadata:
   name: smartmeeting-config
   namespace: smartmeeting
 data:
-  DB_NAME: "smartmeeting"
-  DB_USER: "postgres"
   DB_HOST: "postgres"
   DB_PORT: "5432"
   REDIS_URL: "redis://redis:6379/0"
@@ -23,30 +21,6 @@ data:
   DJANGO_CSRF_TRUSTED_ORIGINS: "https://smartmeeting.galkin.online,http://smartmeeting.galkin.online"
   DJANGO_CSRF_COOKIE_SECURE: "True"
   DJANGO_SESSION_COOKIE_SECURE: "True"
-
----
-# Используем stringData вместо data
-apiVersion: v1
-kind: Secret
-metadata:
-  name: django-secret
-  namespace: smartmeeting
-type: Opaque
-stringData:
-  DJANGO_SECRET_KEY: "django-insecure-9!v&3q@5x#2m$7k8l9p0o1i2u3y4t5r6e7w8q9z0x1c2v3b4n5m6"
-  DB_PASSWORD: "postgres"
-
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: postgres-secret
-  namespace: smartmeeting
-type: Opaque
-stringData:
-  postgres-password: "postgres"
-  postgres-user: "postgres"
-  postgres-db: "smartmeeting"
 
 ---
 apiVersion: v1
@@ -87,18 +61,18 @@ spec:
         - name: POSTGRES_DB
           valueFrom:
             secretKeyRef:
-              name: postgres-secret
-              key: postgres-db
+              name: secrets-project
+              key: DB_DATABASE
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
-              name: postgres-secret
-              key: postgres-user
+              name: secrets-project
+              key: DB_USER
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: postgres-secret
-              key: postgres-password
+              name: secrets-project
+              key: DB_PASSWORD
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
         volumeMounts:
@@ -165,18 +139,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  # Add storage class if needed for your cluster
-  # storageClassName: standard
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: redis-secret
-  namespace: smartmeeting
-type: Opaque
-data: {}
-  # Encode password in base64: echo -n "your_password" | base64
-  # redis-password: <base64-encoded-password>
+
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -204,9 +167,6 @@ spec:
         - "0.0.0.0"
         - "--protected-mode"
         - "no"
-        # Uncomment to require password (use secret)
-        # - "--requirepass"
-        # - "$(REDIS_PASSWORD)"
         volumeMounts:
         - name: redis-storage
           mountPath: /data
@@ -245,9 +205,6 @@ spec:
       - name: redis-storage
         persistentVolumeClaim:
           claimName: redis-pvc
-      # Add node selector/affinity if needed
-      # nodeSelector:
-      #   disktype: ssd
       securityContext:
         fsGroup: 1001  # Redis group
 ---
@@ -262,8 +219,6 @@ spec:
   ports:
   - port: 6379
     targetPort: 6379
-  # Optional: Use ClusterIP, NodePort, or LoadBalancer based on needs
-  # type: ClusterIP
 
 ---
 apiVersion: apps/v1
@@ -288,16 +243,6 @@ spec:
         command: ['python', 'manage.py', 'migrate']
         env:
         # Из ConfigMap
-        - name: DB_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: smartmeeting-config
-              key: DB_NAME
-        - name: DB_USER
-          valueFrom:
-            configMapKeyRef:
-              name: smartmeeting-config
-              key: DB_USER
         - name: DB_HOST
           valueFrom:
             configMapKeyRef:
@@ -319,15 +264,25 @@ spec:
               name: smartmeeting-config
               key: PYTHONUNBUFFERED
         # Из Secret
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: secrets-project
+              key: DB_DATABASE
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: secrets-project
+              key: DB_USER
         - name: DJANGO_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              name: django-secret
+              name: secrets-project
               key: DJANGO_SECRET_KEY
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: django-secret
+              name: secrets-project
               key: DB_PASSWORD
       containers:
       - name: web
@@ -339,16 +294,6 @@ spec:
         args: ["runserver", "0.0.0.0:8000"]
         env:
         # Из ConfigMap
-        - name: DB_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: smartmeeting-config
-              key: DB_NAME
-        - name: DB_USER
-          valueFrom:
-            configMapKeyRef:
-              name: smartmeeting-config
-              key: DB_USER
         - name: DB_HOST
           valueFrom:
             configMapKeyRef:
@@ -385,15 +330,25 @@ spec:
               name: smartmeeting-config
               key: DJANGO_ALLOWED_HOSTS
         # Из Secret
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: secrets-project
+              key: DB_DATABASE
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: secrets-project
+              key: DB_USER
         - name: DJANGO_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              name: django-secret
+              name: secrets-project
               key: DJANGO_SECRET_KEY
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: django-secret
+              name: secrets-project
               key: DB_PASSWORD
         resources:
           requests:
@@ -457,16 +412,6 @@ spec:
         command: ["celery", "-A", "smartmeeting", "worker", "-l", "info"]
         env:
         # Из ConfigMap
-        - name: DB_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: smartmeeting-config
-              key: DB_NAME
-        - name: DB_USER
-          valueFrom:
-            configMapKeyRef:
-              name: smartmeeting-config
-              key: DB_USER
         - name: DB_HOST
           valueFrom:
             configMapKeyRef:
@@ -503,15 +448,25 @@ spec:
               name: smartmeeting-config
               key: DJANGO_ALLOWED_HOSTS
         # Из Secret
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: secrets-project
+              key: DB_DATABASE
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: secrets-project
+              key: DB_USER
         - name: DJANGO_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              name: django-secret
+              name: secrets-project
               key: DJANGO_SECRET_KEY
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: django-secret
+              name: secrets-project
               key: DB_PASSWORD
         resources:
           requests:
@@ -544,16 +499,6 @@ spec:
         command: ["celery", "-A", "smartmeeting", "beat", "-l", "info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
         env:
         # Из ConfigMap
-        - name: DB_NAME
-          valueFrom:
-            configMapKeyRef:
-              name: smartmeeting-config
-              key: DB_NAME
-        - name: DB_USER
-          valueFrom:
-            configMapKeyRef:
-              name: smartmeeting-config
-              key: DB_USER
         - name: DB_HOST
           valueFrom:
             configMapKeyRef:
@@ -590,15 +535,25 @@ spec:
               name: smartmeeting-config
               key: DJANGO_ALLOWED_HOSTS
         # Из Secret
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: secrets-project
+              key: DB_DATABASE
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: secrets-project
+              key: DB_USER
         - name: DJANGO_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              name: django-secret
+              name: secrets-project
               key: DJANGO_SECRET_KEY
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: django-secret
+              name: secrets-project
               key: DB_PASSWORD
         resources:
           requests:
@@ -655,13 +610,6 @@ spec:
     - http01:
         ingress:
           class: nginx
-      # Опционально: добавьте DNS challenge если нужно
-      # dns01:
-      #   cloudflare:
-      #     email: your-email@example.com
-      #     apiTokenSecretRef:
-      #       name: cloudflare-api-token
-      #       key: api-token
 
 ---
 # Для тестовой среды (staging)
