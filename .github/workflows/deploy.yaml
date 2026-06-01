@@ -94,35 +94,41 @@ jobs:
           ENVIRONMENT: ${{ steps.env.outputs.ENVIRONMENT }}
         run: |
           mkdir -p k8s/secrets
-          
+
           if [[ "$ENVIRONMENT" == "production" ]]; then
             echo "Creating .env.secret for PRODUCTION"
-            cat > k8s/secrets/.env.secret <<EOF
-            DB_USER=${{ secrets.PROD_DB_USER }}
-            DB_PASSWORD=${{ secrets.PROD_DB_PASSWORD }}
-            DB_DATABASE=${{ secrets.PROD_DB_DATABASE }}
-            DJANGO_SECRET_KEY=${{ secrets.PROD_DJANGO_SECRET_KEY }}
-            EOF
+
+            {
+              echo "DB_USER=${{ secrets.PROD_DB_USER }}"
+              echo "DB_PASSWORD=${{ secrets.PROD_DB_PASSWORD }}"
+              echo "DB_DATABASE=${{ secrets.PROD_DB_DATABASE }}"
+              echo "DJANGO_SECRET_KEY=${{ secrets.PROD_DJANGO_SECRET_KEY }}"
+            } > k8s/secrets/.env.secret
+
           elif [[ "$ENVIRONMENT" == "staging" ]]; then
             echo "Creating .env.secret for STAGING"
-            cat > k8s/secrets/.env.secret <<EOF
-            DB_USER=${{ secrets.STAGING_DB_USER }}
-            DB_PASSWORD=${{ secrets.STAGING_DB_PASSWORD }}
-            DB_DATABASE=${{ secrets.STAGING_DB_DATABASE }}
-            DJANGO_SECRET_KEY=${{ secrets.STAGING_DJANGO_SECRET_KEY }}
-            EOF
+
+            {
+              echo "DB_USER=${{ secrets.STAGING_DB_USER }}"
+              echo "DB_PASSWORD=${{ secrets.STAGING_DB_PASSWORD }}"
+              echo "DB_DATABASE=${{ secrets.STAGING_DB_DATABASE }}"
+              echo "DJANGO_SECRET_KEY=${{ secrets.STAGING_DJANGO_SECRET_KEY }}"
+            } > k8s/secrets/.env.secret
+
           else
             echo "Creating .env.secret for FEATURE branch"
+
             FEATURE_DB_NAME="${{ secrets.STAGING_DB_DATABASE }}_feature_${{ github.sha }}"
             FEATURE_DB_NAME=$(echo "$FEATURE_DB_NAME" | cut -c1-63)
-            cat > k8s/secrets/.env.secret <<EOF
-            DB_USER=${{ secrets.STAGING_DB_USER }}
-            DB_PASSWORD=${{ secrets.STAGING_DB_PASSWORD }}
-            DB_DATABASE=${FEATURE_DB_NAME}
-            DJANGO_SECRET_KEY=${{ secrets.STAGING_DJANGO_SECRET_KEY }}
-            EOF
+
+            {
+              echo "DB_USER=${{ secrets.STAGING_DB_USER }}"
+              echo "DB_PASSWORD=${{ secrets.STAGING_DB_PASSWORD }}"
+              echo "DB_DATABASE=${FEATURE_DB_NAME}"
+              echo "DJANGO_SECRET_KEY=${{ secrets.STAGING_DJANGO_SECRET_KEY }}"
+            } > k8s/secrets/.env.secret
           fi
-          
+
           if [ -f k8s/secrets/.env.secret ]; then
             echo "✅ .env.secret created successfully"
             echo "Variables present:"
