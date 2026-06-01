@@ -5,18 +5,19 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-staging"
 spec:
+  ingressClassName: nginx
   tls:
-  - hosts:
-    - staging.smartmeeting.galkin.online
-    secretName: smartmeeting-staging-tls
+    - hosts:
+        - staging.smartmeeting.galkin.online
+      secretName: smartmeeting-staging-tls
   rules:
-  - host: staging.smartmeeting.galkin.online
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: web
-            port:
-              number: 8000
+    - host: staging.smartmeeting.galkin.online
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8000

@@ -2,7 +2,7 @@ name: Deploy to Yandex Cloud Kubernetes
 
 on:
   push:
-    branches: 
+    branches:
       - main
       - staging
       - 'feature/**'
@@ -11,99 +11,89 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
+    env:
+      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_NAME: cr.yandex/${{ secrets.CR_REGISTRY_ID }}/${{ secrets.CR_REPOSITORY }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set environment variables
         id: env
+        shell: bash
         run: |
-          if [[ "${{ github.ref_name }}" == "main" ]]; then
+          BRANCH="${{ github.ref_name }}"
+
+          if [[ "$BRANCH" == "main" ]]; then
             ENVIRONMENT="production"
             NAMESPACE="smartmeeting-prod"
             OVERLAY="production"
-            REPLICAS_WEB=3
-            REPLICAS_WORKER=2
-          elif [[ "${{ github.ref_name }}" == "staging" ]]; then
+          elif [[ "$BRANCH" == "staging" ]]; then
             ENVIRONMENT="staging"
             NAMESPACE="smartmeeting-staging"
             OVERLAY="staging"
-            REPLICAS_WEB=2
-            REPLICAS_WORKER=1
-          elif [[ "${{ github.ref_name }}" == feature/* ]]; then
+          elif [[ "$BRANCH" =~ ^feature/ ]]; then
             ENVIRONMENT="feature"
-            BRANCH_NAME="${{ github.ref_name }}"
-            NAMESPACE="feature-${BRANCH_NAME#feature/}"
-            NAMESPACE=$(echo "$NAMESPACE" | sed 's/[^a-zA-Z0-9-]/-/g' | tr '[:upper:]' '[:lower:]')
             OVERLAY="feature"
-            REPLICAS_WEB=1
-            REPLICAS_WORKER=1
-          fi
-          
-          echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_OUTPUT
-          echo "NAMESPACE=$NAMESPACE" >> $GITHUB_OUTPUT
-          echo "OVERLAY=$OVERLAY" >> $GITHUB_OUTPUT
-          echo "REPLICAS_WEB=$REPLICAS_WEB" >> $GITHUB_OUTPUT
-          echo "REPLICAS_WORKER=$REPLICAS_WORKER" >> $GITHUB_OUTPUT
-          
-          echo "Environment: $ENVIRONMENT"
-          echo "Namespace: $NAMESPACE"
-          echo "Overlay: $OVERLAY"
 
-      - name: Login to Yandex CR
+            RAW_NAME="feature-${BRANCH#feature/}"
+            NAMESPACE=$(echo "$RAW_NAME" \
+              | tr '[:upper:]' '[:lower:]' \
+              | sed 's/[^a-z0-9-]/-/g' \
+              | sed 's/^-//;s/-$//' \
+              | cut -c1-63)
+          else
+            echo "Unsupported branch: $BRANCH"
+            exit 1
+          fi
+
+          echo "ENVIRONMENT=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          echo "NAMESPACE=$NAMESPACE" >> "$GITHUB_OUTPUT"
+          echo "OVERLAY=$OVERLAY" >> "$GITHUB_OUTPUT"
+
+      - name: Login to Yandex Container Registry
         uses: yc-actions/yc-cr-login@v1
         with:
           yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
 
-      - name: Build, tag, and push image
-        env:
-          CR_REGISTRY: ${{ secrets.CR_REGISTRY_ID }}
-          CR_REPOSITORY: ${{ secrets.CR_REPOSITORY }}
-          ENVIRONMENT: ${{ steps.env.outputs.ENVIRONMENT }}
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Build and push image
         run: |
-          if [[ "$ENVIRONMENT" == "feature" ]]; then
-            IMAGE_TAG="${{ github.sha }}-feature"
-          elif [[ "$ENVIRONMENT" == "staging" ]]; then
-            IMAGE_TAG="staging-latest"
-          else
-            IMAGE_TAG="latest"
-          fi
-          
-          docker build -t cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$IMAGE_TAG .
-          docker push cr.yandex/$CR_REGISTRY/$CR_REPOSITORY:$IMAGE_TAG
+          docker build -t "$IMAGE_NAME:$IMAGE_TAG" .
+          docker push "$IMAGE_NAME:$IMAGE_TAG"
 
       - name: Install yc CLI
         run: |
           curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
-          echo "$HOME/yandex-cloud/bin" >> $GITHUB_PATH
+          echo "$HOME/yandex-cloud/bin" >> "$GITHUB_PATH"
 
       - name: Authenticate yc CLI
         run: |
-          cat > /tmp/sa-key.json << 'EOF'
-          ${{ secrets.YC_SA_JSON_CREDENTIALS }}
-          EOF
-          
+          echo '${{ secrets.YC_SA_JSON_CREDENTIALS }}' > /tmp/sa-key.json
           yc config set service-account-key /tmp/sa-key.json
           yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
           yc config set cloud-id ${{ secrets.YC_CLOUD_ID }}
 
-      - name: Get Kubernetes cluster credentials
+      - name: Get Kubernetes credentials
         run: |
-          yc managed-kubernetes cluster get-credentials ${{ secrets.YC_K8S_CLUSTER_NAME }} \
+          yc managed-kubernetes cluster get-credentials \
+            ${{ secrets.YC_K8S_CLUSTER_NAME }} \
             --folder-id ${{ secrets.YC_FOLDER_ID }} \
             --external
 
       - name: Install kubectl
-        uses: azure/setup-kubectl@v3
+        uses: azure/setup-kubectl@v4
         with:
-          version: 'latest'
+          version: "1.31.0"
 
-      - name: Create namespace if not exists
+      - name: Create namespace
         run: |
-          kubectl create namespace ${{ steps.env.outputs.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create namespace "${{ steps.env.outputs.NAMESPACE }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
 
-      - name: Create .env.secret from GitHub Secrets
+      - name: Create .env.secret
+        shell: bash
         run: |
           if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "production" ]]; then
             DB_USER="${{ secrets.PROD_DB_USER }}"
@@ -114,49 +104,62 @@ jobs:
             DB_USER="${{ secrets.STAGING_DB_USER }}"
             DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
             DJANGO_SECRET_KEY="${{ secrets.STAGING_DJANGO_SECRET_KEY }}"
-            
+
             if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "feature" ]]; then
-              DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}_feature_${{ github.sha }}"
+              SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+              DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}_f_${SHORT_SHA}"
             else
               DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
             fi
           fi
-          
-          cat > k8s/base/.env.secret << EOF
+
+          cat > k8s/base/.env.secret <<EOF
           DB_USER=${DB_USER}
           DB_PASSWORD=${DB_PASSWORD}
           DB_DATABASE=${DB_DATABASE}
           DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
           EOF
 
-      - name: Deploy to Kubernetes
+      - name: Prepare kustomize overlay
+        shell: bash
+        run: |
+          OVERLAY="${{ steps.env.outputs.OVERLAY }}"
+          NAMESPACE="${{ steps.env.outputs.NAMESPACE }}"
+
+          if [[ "$OVERLAY" == "feature" ]]; then
+            mkdir -p k8s/overlays/temp
+            cp -r k8s/overlays/feature/* k8s/overlays/temp/
+            OVERLAY_PATH="k8s/overlays/temp"
+          else
+            OVERLAY_PATH="k8s/overlays/$OVERLAY"
+          fi
+
+          cd "$OVERLAY_PATH"
+
+          kustomize edit set namespace "$NAMESPACE"
+          kustomize edit set image "$IMAGE_NAME=$IMAGE_NAME:$IMAGE_TAG"
+
+          echo "OVERLAY_PATH=$OVERLAY_PATH" >> "$GITHUB_ENV"
+
+      - name: Validate manifests
+        run: |
+          kubectl apply --dry-run=client -k "$OVERLAY_PATH"
+
+      - name: Deploy
+        run: |
+          kubectl apply -k "$OVERLAY_PATH"
+
+      - name: Wait for deployments
         env:
           NAMESPACE: ${{ steps.env.outputs.NAMESPACE }}
-          OVERLAY: ${{ steps.env.outputs.OVERLAY }}
-          ENVIRONMENT: ${{ steps.env.outputs.ENVIRONMENT }}
         run: |
-          if [[ "$ENVIRONMENT" == "feature" ]]; then
-            # Для feature веток создаем временный kustomization
-            mkdir -p k8s/overlays/temp
-            cp k8s/overlays/feature/kustomization.yaml k8s/overlays/temp/
-            cp k8s/overlays/feature/configmap-patch.yaml k8s/overlays/temp/
-            
-            # Заменяем плейсхолдеры
-            sed -i "s/FEATURE_NAMESPACE/${NAMESPACE}/g" k8s/overlays/temp/kustomization.yaml
-            sed -i "s/FEATURE_TAG/${{ github.sha }}-feature/g" k8s/overlays/temp/kustomization.yaml
-            
-            kubectl apply -k k8s/overlays/temp
-            rm -rf k8s/overlays/temp
-          else
-            kubectl apply -k k8s/overlays/${OVERLAY}
-          fi
-          
-          # Restart deployments
-          kubectl rollout restart deployment/web -n ${NAMESPACE}
-          kubectl rollout restart deployment/celery-worker -n ${NAMESPACE}
-          kubectl rollout restart deployment/celery-beat -n ${NAMESPACE}
-          
-          # Wait for rollouts
-          kubectl rollout status deployment/web -n ${NAMESPACE} --timeout=180s
-          kubectl rollout status deployment/celery-worker -n ${NAMESPACE} --timeout=180s
-          kubectl rollout status deployment/celery-beat -n ${NAMESPACE} --timeout=180s
+          kubectl rollout status deployment/web -n "$NAMESPACE" --timeout=300s
+          kubectl rollout status deployment/celery-worker -n "$NAMESPACE" --timeout=300s
+          kubectl rollout status deployment/celery-beat -n "$NAMESPACE" --timeout=300s
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f /tmp/sa-key.json
+          rm -f k8s/base/.env.secret
+          rm -rf k8s/overlays/temp

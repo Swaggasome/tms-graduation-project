@@ -12,6 +12,5 @@ data:
   EMAIL_BACKEND: "django.core.mail.backends.console.EmailBackend"
   DJANGO_CSRF_COOKIE_SECURE: "True"
   DJANGO_SESSION_COOKIE_SECURE: "True"
-  # Базовые настройки (будут переопределены в overlays)
   DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
   DJANGO_CSRF_TRUSTED_ORIGINS: "http://localhost"

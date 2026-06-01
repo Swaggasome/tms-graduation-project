@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: celery-worker
 spec:
-  replicas: 1  # Базовое значение
+  replicas: 1
   selector:
     matchLabels:
       component: celery-worker
@@ -13,22 +13,22 @@ spec:
         component: celery-worker
     spec:
       containers:
-      - name: celery
-        image: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:latest
-        imagePullPolicy: IfNotPresent
-        command: ["celery", "-A", "smartmeeting", "worker", "-l", "info"]
-        envFrom:
-        - configMapRef:
-            name: smartmeeting-config
-        - secretRef:
-            name: secrets-project
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "384Mi"
-            cpu: "300m"
+        - name: celery
+          image: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:dev
+          imagePullPolicy: IfNotPresent
+          command: ["celery", "-A", "smartmeeting", "worker", "-l", "info"]
+          envFrom:
+            - configMapRef:
+                name: smartmeeting-config
+            - secretRef:
+                name: secrets-project
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "384Mi"
+              cpu: "300m"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -45,19 +45,27 @@ spec:
         component: celery-beat
     spec:
       containers:
-      - name: celery-beat
-        image: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:latest
-        imagePullPolicy: IfNotPresent
-        command: ["celery", "-A", "smartmeeting", "beat", "-l", "info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
-        envFrom:
-        - configMapRef:
-            name: smartmeeting-config
-        - secretRef:
-            name: secrets-project
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "50m"
-          limits:
-            memory: "128Mi"
-            cpu: "100m"
+        - name: celery-beat
+          image: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:dev
+          imagePullPolicy: IfNotPresent
+          command:
+            - "celery"
+            - "-A"
+            - "smartmeeting"
+            - "beat"
+            - "-l"
+            - "info"
+            - "--scheduler"
+            - "django_celery_beat.schedulers:DatabaseScheduler"
+          envFrom:
+            - configMapRef:
+                name: smartmeeting-config
+            - secretRef:
+                name: secrets-project
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
