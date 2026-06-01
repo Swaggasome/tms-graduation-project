@@ -152,7 +152,7 @@ jobs:
             mkdir -p k8s/overlays/temp
             
             # Создаем kustomization.yaml без heredoc проблем
-            cat > k8s/overlays/temp/kustomization.yaml <<KUSTOMIZATION_EOF
+            cat > k8s/overlays/temp/kustomization.yaml <<-KUSTOMIZATION_EOF
             apiVersion: kustomize.config.k8s.io/v1beta1
             kind: Kustomization
             
