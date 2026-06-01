@@ -38,25 +38,32 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 kubectl get pods -n cert-manager
 kubectl get pods -n ingress-nginx
 ```
-5. Установаем наше приложение в кластер
+5. подгатавливаем секреты. Создаем файл k8s/.env.secret
 ```
-kubectl apply -f k8s/deployment.yaml
+DB_USER=<DB USER>
+DB_PASSWORD=<DB PASSWORD>
+DB_DATABASE=<DB NAME>
+DJANGO_SECRET_KEY='<DJANGO SECRET KEY>'
+````
+6. Установаем наше приложение в кластер
 ```
-6. Проверяем статус приложения в кластере
+kubectl apply -f k8s/.
+```
+7. Проверяем статус приложения в кластере
 ```
 kubectl get pods -n smartmeeting
 ```
-7. Достаем IP адрес ingress-nginx LoadBalancer
+8. Достаем IP адрес ingress-nginx LoadBalancer
 ```
-kubectl get svc ingress-nginx -n ingress-nginx
+kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
-8. Добавляем DNS запись типа A smartmeeting.example.com с IP адресом ingress-nginx LoadBalancer
+9. Добавляем DNS запись типа A smartmeeting.example.com с IP адресом ingress-nginx LoadBalancer
 
-9. Через некоторое время заходимся на http://smartmeeting.example.com и проверяем работоспособность приложения
+10. Через некоторое время заходимся на http://smartmeeting.example.com и проверяем работоспособность приложения
 
 ![alt text](image.png)
 
-10. Окончательная настройка приложения
+11. Окончательная настройка приложения
 ```
 kubectl get pods -n smartmeeting
 kubectl -n smartmeeting exec -it <web pod name> -- python manage.py create_rooms
