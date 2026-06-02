@@ -10,7 +10,7 @@ services:
     networks:
       - smartmeeting_network
 
-  db:
+  postgres:
     image: postgres:15
     environment:
       POSTGRES_DB: smartmeeting
@@ -32,10 +32,10 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
+      - postgres
       - redis
     environment:
-      DATABASE_URL: postgres://postgres:postgres@db:5432/smartmeeting
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/smartmeeting
       REDIS_URL: redis://redis:6379
     networks:
       - smartmeeting_network
@@ -46,10 +46,10 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - db
+      - postgres
       - redis
     environment:
-      DATABASE_URL: postgres://postgres:postgres@db:5432/smartmeeting
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/smartmeeting
       REDIS_URL: redis://redis:6379  # Используем имя сервиса, не localhost
     networks:
       - smartmeeting_network
@@ -60,11 +60,11 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - db
+      - postgres
       - redis
       - celery
     environment:
-      DATABASE_URL: postgres://postgres:postgres@db:5432/smartmeeting
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/smartmeeting
       REDIS_URL: redis://redis:6379  # Используем имя сервиса, не localhost
     networks:
       - smartmeeting_network
