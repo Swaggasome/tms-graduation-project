@@ -2,25 +2,28 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - configmap.yaml
-  - postgres.yaml
-  - redis.yaml
-  - web.yaml
-  - celery.yaml
-  - ingress.yaml
+- configmap.yaml
+- postgres.yaml
+- redis.yaml
+- web.yaml
+- celery.yaml
+- ingress.yaml
 
 generatorOptions:
   disableNameSuffixHash: true
 
 secretGenerator:
-  - name: secrets-project
-    envs:
-      - .env.secret
-    type: Opaque
+- envs:
+  - .env.secret
+  name: secrets-project
+  type: Opaque
 
-commonLabels:
-  app: smartmeeting
-  managed-by: kustomize
 
 commonAnnotations:
   organization: smartmeeting
+
+labels:
+- includeSelectors: true
+  pairs:
+    app: smartmeeting
+    managed-by: kustomize
