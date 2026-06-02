@@ -120,14 +120,14 @@ USE_TZ = True
 
 # Статика и медиа
 YC_STORAGE_BUCKET_NAME = os.getenv("YC_STORAGE_BUCKET_NAME")
-# YC_STORAGE_ACCESS_KEY = os.getenv("YC_STORAGE_ACCESS_KEY")
-# YC_STORAGE_SECRET_KEY = os.getenv("YC_STORAGE_SECRET_KEY")
+YC_STORAGE_ACCESS_KEY = os.getenv("YC_STORAGE_ACCESS_KEY")
+YC_STORAGE_SECRET_KEY = os.getenv("YC_STORAGE_SECRET_KEY")
 
 AWS_S3_ENDPOINT_URL = "https://storage.yandexcloud.net"
 AWS_S3_REGION_NAME = "ru-central1"
 AWS_STORAGE_BUCKET_NAME = YC_STORAGE_BUCKET_NAME
-# AWS_ACCESS_KEY_ID = YC_STORAGE_ACCESS_KEY
-# AWS_SECRET_ACCESS_KEY = YC_STORAGE_SECRET_KEY
+AWS_ACCESS_KEY_ID = YC_STORAGE_ACCESS_KEY
+AWS_SECRET_ACCESS_KEY = YC_STORAGE_SECRET_KEY
 
 AWS_LOCATION = "static"
 AWS_QUERYSTRING_AUTH = False
@@ -143,8 +143,8 @@ STORAGES = {
         "BACKEND": "storages.backends.s3.S3Storage",
         "OPTIONS": {
             "bucket_name": YC_STORAGE_BUCKET_NAME,
-            # "access_key": YC_STORAGE_ACCESS_KEY,
-            # "secret_key": YC_STORAGE_SECRET_KEY,
+            "access_key": YC_STORAGE_ACCESS_KEY,
+            "secret_key": YC_STORAGE_SECRET_KEY,
             "endpoint_url": AWS_S3_ENDPOINT_URL,
             "region_name": AWS_S3_REGION_NAME,
             "location": AWS_LOCATION,

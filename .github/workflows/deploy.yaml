@@ -103,6 +103,8 @@ jobs:
             EMAIL_HOST_USER="${{ secrets.EMAIL_HOST_USER }}"
             EMAIL_HOST_PASSWORD="${{ secrets.EMAIL_HOST_PASSWORD }}"
             YC_STORAGE_BUCKET_NAME="${{ secrets.YC_STORAGE_BUCKET_NAME }}"
+            YC_STORAGE_ACCESS_KEY="${{ secrets.YC_STORAGE_ACCESS_KEY }}"
+            YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
           else
             DB_USER="${{ secrets.STAGING_DB_USER }}"
             DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
@@ -110,7 +112,8 @@ jobs:
             EMAIL_HOST_USER="${{ secrets.EMAIL_HOST_USER }}"
             EMAIL_HOST_PASSWORD="${{ secrets.EMAIL_HOST_PASSWORD }}"
             YC_STORAGE_BUCKET_NAME="${{ secrets.YC_STORAGE_BUCKET_NAME }}"
-
+            YC_STORAGE_ACCESS_KEY="${{ secrets.YC_STORAGE_ACCESS_KEY }}"
+            YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
             if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "feature" ]]; then
               SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
               DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}_f_${SHORT_SHA}"
@@ -127,6 +130,8 @@ jobs:
           EMAIL_HOST_USER=${EMAIL_HOST_USER}
           EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
           YC_STORAGE_BUCKET_NAME=${YC_STORAGE_BUCKET_NAME}
+          YC_STORAGE_ACCESS_KEY=${YC_STORAGE_ACCESS_KEY}
+          YC_STORAGE_SECRET_KEY=${YC_STORAGE_SECRET_KEY}
           EOF
 
       - name: Prepare kustomize overlay
