@@ -70,8 +70,6 @@ kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.
 11. Окончательная настройка приложения
 ```
 kubectl get pods -n smartmeeting
-kubectl -n smartmeeting exec -it <web pod name> -- python manage.py create_rooms
-kubectl -n smartmeeting exec -it <web pod name> -- python manage.py setup_reminder_schedule
 kubectl -n smartmeeting exec -it <web pod name> -- python manage.py createsuperuser
 ```
 
