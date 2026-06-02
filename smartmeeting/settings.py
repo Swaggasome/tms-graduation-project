@@ -87,7 +87,7 @@ WSGI_APPLICATION = 'smartmeeting.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME', 'smartmeeting'),
+        'NAME': os.environ.get('DB_DATABASE', 'smartmeeting'),
         'USER': os.environ.get('DB_USER', 'postgres'),
         'PASSWORD': os.environ.get('DB_PASSWORD', 'postgres'),
         'HOST': os.environ.get('DB_HOST', 'postgres'),
