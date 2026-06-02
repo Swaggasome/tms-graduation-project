@@ -85,7 +85,7 @@ jobs:
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
         with:
-          version: "1.31.0"
+          version: "v1.31.0"
 
       - name: Create namespace
         run: |

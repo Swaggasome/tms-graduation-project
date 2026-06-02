@@ -4,7 +4,8 @@ metadata:
   name: smartmeeting-config
 data:
   DJANGO_DEBUG: "False"
-  DJANGO_ALLOWED_HOSTS: "smartmeeting.galkin.online,smartmeeting.example.com"
+  # DJANGO_ALLOWED_HOSTS: "smartmeeting.galkin.online,smartmeeting.example.com,10.112.*"
+  DJANGO_ALLOWED_HOSTS: "*"
   DJANGO_CSRF_TRUSTED_ORIGINS: "https://smartmeeting.galkin.online,https://smartmeeting.example.com"
   DJANGO_CSRF_COOKIE_SECURE: "True"
   DJANGO_SESSION_COOKIE_SECURE: "True"
