@@ -100,10 +100,14 @@ jobs:
             DB_PASSWORD="${{ secrets.PROD_DB_PASSWORD }}"
             DB_DATABASE="${{ secrets.PROD_DB_DATABASE }}"
             DJANGO_SECRET_KEY="${{ secrets.PROD_DJANGO_SECRET_KEY }}"
+            EMAIL_HOST_USER="${{ secrets.EMAIL_HOST_USER }}"
+            EMAIL_HOST_PASSWORD="${{ secrets.EMAIL_HOST_PASSWORD }}"
           else
             DB_USER="${{ secrets.STAGING_DB_USER }}"
             DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
             DJANGO_SECRET_KEY="${{ secrets.STAGING_DJANGO_SECRET_KEY }}"
+            EMAIL_HOST_USER="${{ secrets.EMAIL_HOST_USER }}"
+            EMAIL_HOST_PASSWORD="${{ secrets.EMAIL_HOST_PASSWORD }}"
 
             if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "feature" ]]; then
               SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
@@ -118,6 +122,8 @@ jobs:
           DB_PASSWORD=${DB_PASSWORD}
           DB_DATABASE=${DB_DATABASE}
           DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+          EMAIL_HOST_USER=${EMAIL_HOST_USER }
+          EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD }
           EOF
 
       - name: Prepare kustomize overlay
