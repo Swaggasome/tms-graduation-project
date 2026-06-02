@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: celery
-          image: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:dev
+          image: cr.yandex/crpjk67er58r3atnlgii/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command: ["celery", "-A", "smartmeeting", "worker", "-l", "info"]
           envFrom:
@@ -46,7 +46,7 @@ spec:
     spec:
       containers:
         - name: celery-beat
-          image: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:dev
+          image: cr.yandex/crpjk67er58r3atnlgii/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command:
             - "celery"
