@@ -6,34 +6,14 @@ resources:
 
 namespace: smartmeeting-prod
 
+replicas:
+  - name: web
+    count: 3
+  - name: celery-worker
+    count: 2
+  - name: celery-beat
+    count: 1
+
 patches:
-- target:
-    kind: Deployment
-    name: web
-  patch: |-
-    - op: replace
-      path: /spec/replicas
-      value: 3
-    - op: replace
-      path: /spec/template/spec/containers/0/image
-      value: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:latest
-
-- target:
-    kind: Deployment
-    name: celery-worker
-  patch: |-
-    - op: replace
-      path: /spec/replicas
-      value: 2
-
-- target:
-    kind: Service
-    name: web
-  patch: |-
-    - op: replace
-      path: /spec/type
-      value: LoadBalancer
-
-images:
-- name: cr.yandex/crpfasovola9dqldhpk4/smartmeeting
-  newTag: latest
+  - path: configmap-patch.yaml
+  - path: ingress-patch.yaml

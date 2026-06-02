@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: web
 spec:
-  replicas: 1  # Базовое значение
+  replicas: 1
   selector:
     matchLabels:
       component: web
@@ -13,50 +13,68 @@ spec:
         component: web
     spec:
       initContainers:
-      - name: run-migrations
-        image: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:latest
-        imagePullPolicy: Always
-        command: ['python', 'manage.py', 'migrate']
-        envFrom:
-        - configMapRef:
-            name: smartmeeting-config
-        - secretRef:
-            name: secrets-project
+        - name: run-migrations
+          image: cr.yandex/crpjk67er58r3atnlgii/smartmeeting:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "manage.py", "migrate"]
+          envFrom:
+            - configMapRef:
+                name: smartmeeting-config
+            - secretRef:
+                name: secrets-project
+        - name: run-create-rooms
+          image: cr.yandex/crpjk67er58r3atnlgii/smartmeeting:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "manage.py", "create_rooms"]
+          envFrom:
+            - configMapRef:
+                name: smartmeeting-config
+            - secretRef:
+                name: secrets-project
+        - name: run-setup-reminder-schedule
+          image: cr.yandex/crpjk67er58r3atnlgii/smartmeeting:dev
+          imagePullPolicy: IfNotPresent
+          command: ["python", "manage.py", "setup_reminder_schedule"]
+          envFrom:
+            - configMapRef:
+                name: smartmeeting-config
+            - secretRef:
+                name: secrets-project
       containers:
-      - name: web
-        image: cr.yandex/crpfasovola9dqldhpk4/smartmeeting:latest
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 8000
-        command: ["gunicorn"]
-        args: 
-        - "--bind"
-        - "0.0.0.0:8000"
-        - "smartmeeting.wsgi:application"
-        envFrom:
-        - configMapRef:
-            name: smartmeeting-config
-        - secretRef:
-            name: secrets-project
-        resources:
-          requests:
-            memory: "128Mi"
-            cpu: "100m"
-          limits:
-            memory: "384Mi"
-            cpu: "300m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 5
-          periodSeconds: 5
+        - name: web
+          image: cr.yandex/crpjk67er58r3atnlgii/smartmeeting:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          command: ["gunicorn"]
+          args:
+            - "--bind"
+            - "0.0.0.0:8000"
+            - "smartmeeting.wsgi:application"
+          envFrom:
+            - configMapRef:
+                name: smartmeeting-config
+            - secretRef:
+                name: secrets-project
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "384Mi"
+              cpu: "300m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
 ---
 apiVersion: v1
 kind: Service
@@ -66,6 +84,6 @@ spec:
   selector:
     component: web
   ports:
-  - port: 8000
-    targetPort: 8000
-  type: ClusterIP  # Базовый тип, будет переопределен
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP

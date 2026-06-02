@@ -3,15 +3,11 @@ kind: Ingress
 metadata:
   name: smartmeeting-ingress
   annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
   ingressClassName: nginx
-  tls:
-    - hosts:
-        - smartmeeting.galkin.online
-      secretName: smartmeeting-tls
   rules:
-    - host: smartmeeting.galkin.online
+    - host: placeholder.domain
       http:
         paths:
           - path: /
