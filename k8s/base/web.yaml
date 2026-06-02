@@ -12,9 +12,6 @@ spec:
       labels:
         component: web
     spec:
-      volumes:
-      - name: staticfiles
-        emptyDir: {}
       initContainers:
         - name: run-migrations
           image: cr.yandex/crpjk67er58r3atnlgii/smartmeeting:dev
@@ -43,22 +40,19 @@ spec:
                 name: smartmeeting-config
             - secretRef:
                 name: secrets-project
-        - name: run-collectstatic
-          image: cr.yandex/crpjk67er58r3atnlgii/smartmeeting:dev
-          imagePullPolicy: IfNotPresent
-          command: ["python", "manage.py", "collectstatic", "--noinput"]
-          envFrom:
-            - configMapRef:
-                name: smartmeeting-config
-            - secretRef:
-                name: secrets-project
+        # - name: run-collectstatic
+        #   image: cr.yandex/crpjk67er58r3atnlgii/smartmeeting:dev
+        #   imagePullPolicy: IfNotPresent
+        #   command: ["python", "manage.py", "collectstatic --noinput"]
+        #   envFrom:
+        #     - configMapRef:
+        #         name: smartmeeting-config
+        #     - secretRef:
+        #         name: secrets-project
       containers:
         - name: web
           image: cr.yandex/crpjk67er58r3atnlgii/smartmeeting:dev
           imagePullPolicy: IfNotPresent
-          volumeMounts:
-          - name: staticfiles
-            mountPath: /app/staticfiles
           ports:
             - containerPort: 8000
           command: ["gunicorn"]

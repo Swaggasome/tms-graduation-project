@@ -45,6 +45,7 @@ INSTALLED_APPS = [
 
     # Сторонние приложения
     'django_celery_beat',
+    'storages',
 
     # НАШИ ПРИЛОЖЕНИЯ
     'apps.accounts',
@@ -118,10 +119,46 @@ USE_I18N = True
 USE_TZ = True
 
 # Статика и медиа
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']
+YC_STORAGE_BUCKET_NAME = os.getenv("YC_STORAGE_BUCKET_NAME")
+# YC_STORAGE_ACCESS_KEY = os.getenv("YC_STORAGE_ACCESS_KEY")
+# YC_STORAGE_SECRET_KEY = os.getenv("YC_STORAGE_SECRET_KEY")
+
+AWS_S3_ENDPOINT_URL = "https://storage.yandexcloud.net"
+AWS_S3_REGION_NAME = "ru-central1"
+AWS_STORAGE_BUCKET_NAME = YC_STORAGE_BUCKET_NAME
+# AWS_ACCESS_KEY_ID = YC_STORAGE_ACCESS_KEY
+# AWS_SECRET_ACCESS_KEY = YC_STORAGE_SECRET_KEY
+
+AWS_LOCATION = "static"
+AWS_QUERYSTRING_AUTH = False
+AWS_DEFAULT_ACL = "public-read"
+
+STATIC_URL = f"https://storage.yandexcloud.net/{YC_STORAGE_BUCKET_NAME}/static/"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": YC_STORAGE_BUCKET_NAME,
+            # "access_key": YC_STORAGE_ACCESS_KEY,
+            # "secret_key": YC_STORAGE_SECRET_KEY,
+            "endpoint_url": AWS_S3_ENDPOINT_URL,
+            "region_name": AWS_S3_REGION_NAME,
+            "location": AWS_LOCATION,
+            "default_acl": "public-read",
+            "querystring_auth": False,
+            "object_parameters": {
+                "CacheControl": "max-age=86400",
+            },
+        },
+    },
+}
+# STATIC_URL = '/static/'
+# STATICFILES_DIRS = [BASE_DIR / 'static']
 # STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
