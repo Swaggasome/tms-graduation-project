@@ -1,0 +1,53 @@
+name: Cleanup Feature Environment
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  cleanup:
+    if: >
+      github.event.pull_request.merged == true &&
+      startsWith(github.event.pull_request.head.ref, 'feature/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install yc CLI
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          echo "$HOME/yandex-cloud/bin" >> "$GITHUB_PATH"
+
+      - name: Authenticate yc CLI
+        run: |
+          echo '${{ secrets.YC_SA_JSON_CREDENTIALS }}' > /tmp/sa-key.json
+
+          yc config set service-account-key /tmp/sa-key.json
+          yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
+          yc config set cloud-id ${{ secrets.YC_CLOUD_ID }}
+
+      - name: Get Kubernetes credentials
+        run: |
+          yc managed-kubernetes cluster get-credentials \
+            ${{ secrets.YC_K8S_CLUSTER_NAME }} \
+            --folder-id ${{ secrets.YC_FOLDER_ID }} \
+            --external
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.31.0"
+
+      - name: Delete feature namespace
+        run: |
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+
+          NAMESPACE=$(echo "feature-${BRANCH#feature/}" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed 's/[^a-z0-9-]/-/g' \
+            | sed 's/^-//;s/-$//' \
+            | cut -c1-63)
+
+          echo "Deleting namespace: $NAMESPACE"
+
+          kubectl delete namespace "$NAMESPACE" --ignore-not-found=true
