@@ -4,8 +4,13 @@ metadata:
   name: smartmeeting-config
 data:
   DJANGO_DEBUG: "True"
+
   DJANGO_ALLOWED_HOSTS: "*"
   DJANGO_CSRF_TRUSTED_ORIGINS: ""
   DJANGO_CSRF_COOKIE_SECURE: "False"
   DJANGO_SESSION_COOKIE_SECURE: "False"
-  EMAIL_BACKEND: "django.core.mail.backends.console.EmailBackend"
+
+  DB_HOST: "postgres.smartmeeting-staging.svc.cluster.local"
+  DB_PORT: "5432"
+
+  REDIS_URL: "redis://redis.smartmeeting-staging.svc.cluster.local:6379/0"
