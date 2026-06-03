@@ -106,8 +106,6 @@ jobs:
             YC_STORAGE_ACCESS_KEY="${{ secrets.YC_STORAGE_ACCESS_KEY }}"
             YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
             CR_REGISTRY_ID="${{ secrets.CR_REGISTRY_ID }}"
-            LETSENCRYPT_EMAIL="${{ secrets.LETSENCRYPT_EMAIL }}"
-            HOST="${{ secrets.HOST }}"
           else
             DB_USER="${{ secrets.STAGING_DB_USER }}"
             DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
@@ -118,8 +116,6 @@ jobs:
             YC_STORAGE_ACCESS_KEY="${{ secrets.YC_STORAGE_ACCESS_KEY }}"
             YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
             CR_REGISTRY_ID="${{ secrets.CR_REGISTRY_ID }}"
-            LETSENCRYPT_EMAIL="${{ secrets.LETSENCRYPT_EMAIL }}"
-            HOST="${{ secrets.HOST }}"
             if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "feature" ]]; then
               SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
               DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}_f_${SHORT_SHA}"
@@ -139,8 +135,6 @@ jobs:
           YC_STORAGE_ACCESS_KEY=${YC_STORAGE_ACCESS_KEY}
           YC_STORAGE_SECRET_KEY=${YC_STORAGE_SECRET_KEY}
           CR_REGISTRY_ID=${CR_REGISTRY_ID}
-          LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
-          HOST=${HOST}
           EOF
 
       - name: Prepare kustomize overlay
