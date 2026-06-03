@@ -6,12 +6,18 @@ metadata:
     cert-manager.io/cluster-issuer: "letsencrypt-staging"
 spec:
   ingressClassName: nginx
+  env:
+  - name: HOST
+    valueFrom:
+      secretKeyRef:
+        name: secrets-project
+        key: HOST
   tls:
     - hosts:
-        - staging.smartmeeting.galkin.online
+        - staging.smartmeeting.$(HOST)
       secretName: smartmeeting-staging-tls
   rules:
-    - host: staging.smartmeeting.galkin.online
+    - host: staging.smartmeeting.$(HOST)
       http:
         paths:
           - path: /

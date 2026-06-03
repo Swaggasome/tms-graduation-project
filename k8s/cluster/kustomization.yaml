@@ -3,5 +3,3 @@ kind: Kustomization
 
 resources:
   - cluster-issuers.yaml
-  # - storage-class.yaml
-  # - network-policies.yaml

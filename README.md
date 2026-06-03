@@ -13,7 +13,7 @@
 1. Достаем ключ json для GitHub push registry 
 ```
 terraform output -raw yc_sa_json_credentials_raw > key.json
-xclip -selection clipboard < key.json
+xclip -selection clipboard < key.json && rm key.json
 ```
 2. После поднятия k8s кластера подгатавливаем чувствительные данные. В GiHub создаем секреты.
   - YC_SA_JSON_CREDENTIALS - json ключ сервисного аккаунта для push registry из буфера после предыдущей команды

@@ -6,12 +6,18 @@ metadata:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
 spec:
   ingressClassName: nginx
+  env:
+  - name: HOST
+    valueFrom:
+      secretKeyRef:
+        name: secrets-project
+        key: HOST
   tls:
     - hosts:
-        - smartmeeting.galkin.online
+        - smartmeeting.$(HOST)
       secretName: smartmeeting-tls
   rules:
-    - host: smartmeeting.galkin.online
+    - host: smartmeeting.$(HOST)
       http:
         paths:
           - path: /

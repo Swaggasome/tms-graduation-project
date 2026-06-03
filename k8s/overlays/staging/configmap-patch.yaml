@@ -2,11 +2,16 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: smartmeeting-config
+env:
+  - name: HOST
+    valueFrom:
+      secretKeyRef:
+        name: secrets-project
+        key: HOST
 data:
   DJANGO_DEBUG: "True"
-  # DJANGO_ALLOWED_HOSTS: "staging.smartmeeting.galkin.online,staging.example.com"
   DJANGO_ALLOWED_HOSTS: "*"
-  DJANGO_CSRF_TRUSTED_ORIGINS: "https://staging.smartmeeting.galkin.online"
+  DJANGO_CSRF_TRUSTED_ORIGINS: "https://staging.smartmeeting.$(HOST),http://staging.smartmeeting.$(HOST)"
   DJANGO_CSRF_COOKIE_SECURE: "False"
   DJANGO_SESSION_COOKIE_SECURE: "False"
   EMAIL_BACKEND: "django.core.mail.backends.console.EmailBackend"
