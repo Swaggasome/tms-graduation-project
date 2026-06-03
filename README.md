@@ -78,3 +78,4 @@ kubectl -n smartmeeting exec -it <web pod name> -- python manage.py createsuperu
 ```
 
 ToDo: Дополнить CI/CD workfow 
+ToDo: Добавить мониторинг приложения и кластера
