@@ -116,7 +116,7 @@ jobs:
             YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
             if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "feature" ]]; then
               SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
-              DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}_f_${SHORT_SHA}"
+              DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
             else
               DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
             fi
