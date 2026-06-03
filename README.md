@@ -13,7 +13,7 @@
 1. Достаем ключ json для GitHub push registry 
 ```
 terraform output -raw yc_sa_json_credentials_raw > key.json
-xclip -selection clipboard < key.json
+xclip -selection clipboard < key.json && rm key.json
 ```
 2. После поднятия k8s кластера подгатавливаем чувствительные данные. В GiHub создаем секреты.
   - YC_SA_JSON_CREDENTIALS - json ключ сервисного аккаунта для push registry из буфера после предыдущей команды
@@ -42,6 +42,10 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 kubectl get pods -n cert-manager
 kubectl get pods -n ingress-nginx
 ```
+```
+kubectl apply -k k8s/cluster/.
+```
+
 5. подгатавливаем секреты. Создаем файл k8s/.env.secret
 ```
 DB_USER=<DB USER>
