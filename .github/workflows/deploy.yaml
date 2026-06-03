@@ -105,7 +105,6 @@ jobs:
             YC_STORAGE_BUCKET_NAME="${{ secrets.YC_STORAGE_BUCKET_NAME }}"
             YC_STORAGE_ACCESS_KEY="${{ secrets.YC_STORAGE_ACCESS_KEY }}"
             YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
-            CR_REGISTRY_ID="${{ secrets.CR_REGISTRY_ID }}"
           else
             DB_USER="${{ secrets.STAGING_DB_USER }}"
             DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
@@ -115,7 +114,6 @@ jobs:
             YC_STORAGE_BUCKET_NAME="${{ secrets.YC_STORAGE_BUCKET_NAME }}"
             YC_STORAGE_ACCESS_KEY="${{ secrets.YC_STORAGE_ACCESS_KEY }}"
             YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
-            CR_REGISTRY_ID="${{ secrets.CR_REGISTRY_ID }}"
             if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "feature" ]]; then
               SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
               DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}_f_${SHORT_SHA}"
@@ -134,7 +132,6 @@ jobs:
           YC_STORAGE_BUCKET_NAME=${YC_STORAGE_BUCKET_NAME}
           YC_STORAGE_ACCESS_KEY=${YC_STORAGE_ACCESS_KEY}
           YC_STORAGE_SECRET_KEY=${YC_STORAGE_SECRET_KEY}
-          CR_REGISTRY_ID=${CR_REGISTRY_ID}
           EOF
 
       - name: Prepare kustomize overlay

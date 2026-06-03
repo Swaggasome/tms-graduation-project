@@ -14,13 +14,7 @@ spec:
     spec:
       containers:
         - name: celery
-          env:
-          - name: CR_REGISTRY_ID
-            valueFrom:
-              secretKeyRef:
-                name: secrets-project
-                key: CR_REGISTRY_ID
-          image: cr.yandex/"$(CR_REGISTRY_ID)"/smartmeeting:dev
+          image: cr.yandex/crpj6du42j5j3l2hec96/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command: ["celery", "-A", "smartmeeting", "worker", "-l", "info"]
           envFrom:
@@ -52,13 +46,7 @@ spec:
     spec:
       containers:
         - name: celery-beat
-          env:
-          - name: CR_REGISTRY_ID
-            valueFrom:
-              secretKeyRef:
-                name: secrets-project
-                key: CR_REGISTRY_ID
-          image: cr.yandex/"$(CR_REGISTRY_ID)"/smartmeeting:dev
+          image: cr.yandex/crpj6du42j5j3l2hec96/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command:
             - "celery"

@@ -14,13 +14,7 @@ spec:
     spec:
       initContainers:
         - name: run-migrations
-          env:
-          - name: CR_REGISTRY_ID
-            valueFrom:
-              secretKeyRef:
-                name: secrets-project
-                key: CR_REGISTRY_ID
-          image: cr.yandex/"$(CR_REGISTRY_ID)"/smartmeeting:dev
+          image: cr.yandex/crpj6du42j5j3l2hec96/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "migrate"]
           envFrom:
@@ -29,13 +23,7 @@ spec:
             - secretRef:
                 name: secrets-project
         - name: run-create-rooms
-          env:
-            - name: CR_REGISTRY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: secrets-project
-                  key: CR_REGISTRY_ID
-          image: cr.yandex/"$(CR_REGISTRY_ID)"/smartmeeting:dev
+          image: cr.yandex/crpj6du42j5j3l2hec96/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "create_rooms"]
           envFrom:
@@ -44,13 +32,7 @@ spec:
             - secretRef:
                 name: secrets-project
         - name: run-setup-reminder-schedule
-          env:
-            - name: CR_REGISTRY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: secrets-project
-                  key: CR_REGISTRY_ID
-          image: cr.yandex/"$(CR_REGISTRY_ID)"/smartmeeting:dev
+          image: cr.yandex/crpj6du42j5j3l2hec96/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "setup_reminder_schedule"]
           envFrom:
@@ -59,13 +41,7 @@ spec:
             - secretRef:
                 name: secrets-project
         - name: run-collectstatic
-          env:
-            - name: CR_REGISTRY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: secrets-project
-                  key: CR_REGISTRY_ID
-          image: cr.yandex/"$(CR_REGISTRY_ID)"/smartmeeting:dev
+          image: cr.yandex/crpj6du42j5j3l2hec96/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "collectstatic", "--noinput"]
           envFrom:
@@ -75,13 +51,7 @@ spec:
                 name: secrets-project
       containers:
         - name: web
-          env:
-            - name: CR_REGISTRY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: secrets-project
-                  key: CR_REGISTRY_ID
-          image: cr.yandex/"$(CR_REGISTRY_ID)"/smartmeeting:dev
+          image: cr.yandex/crpj6du42j5j3l2hec96/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
