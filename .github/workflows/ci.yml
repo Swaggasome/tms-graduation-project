@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+      - staging
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create dummy secret env file
+        run: |
+          cat > k8s/base/.env.secret <<EOF
+          DB_USER=dummy
+          DB_PASSWORD=dummy
+          DB_DATABASE=dummy
+          DJANGO_SECRET_KEY=dummy
+          EOF
+
+      - name: Validate kustomize manifests
+        run: |
+          kubectl kustomize k8s/overlays/staging > /tmp/staging.yaml
+          kubectl kustomize k8s/overlays/production > /tmp/production.yaml
