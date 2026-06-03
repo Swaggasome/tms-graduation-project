@@ -4,13 +4,7 @@ metadata:
   name: letsencrypt-prod
 spec:
   acme:
-    env:
-    - name: LETSENCRYPT_EMAIL
-      valueFrom:
-        secretKeyRef:
-          name: secrets-project
-          key: LETSENCRYPT_EMAIL
-    email: $(LETENCRYPT_EMAIL)
+    email: v.g.galkin@gmail.com
     server: https://acme-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: letsencrypt-prod-private-key
@@ -25,13 +19,7 @@ metadata:
   name: letsencrypt-staging
 spec:
   acme:
-    env:
-    - name: LETSENCRYPT_EMAIL
-      valueFrom:
-        secretKeyRef:
-          name: secrets-project
-          key: LETSENCRYPT_EMAIL
-    email: $(LETENCRYPT_EMAIL)
+    email: v.g.galkin@gmail.com
     server: https://acme-staging-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: letsencrypt-staging-private-key
