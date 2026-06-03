@@ -20,7 +20,7 @@ spec:
               secretKeyRef:
                 name: secrets-project
                 key: CR_REGISTRY_ID
-          image: cr.yandex/$(CR_REGISTRY_ID)/smartmeeting:dev
+          image: cr.yandex/"$(CR_REGISTRY_ID)"/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command: ["celery", "-A", "smartmeeting", "worker", "-l", "info"]
           envFrom:
@@ -58,7 +58,7 @@ spec:
               secretKeyRef:
                 name: secrets-project
                 key: CR_REGISTRY_ID
-          image: cr.yandex/$(CR_REGISTRY_ID)/smartmeeting:dev
+          image: cr.yandex/"$(CR_REGISTRY_ID)"/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command:
             - "celery"
