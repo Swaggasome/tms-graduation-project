@@ -1,0 +1,33 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: smartmeeting-alerts
+  labels:
+    app: smartmeeting
+spec:
+  groups:
+    - name: smartmeeting.rules
+      rules:
+        - alert: SmartmeetingWebDown
+          expr: up{job="smartmeeting-web"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Smartmeeting web is down"
+
+        - alert: SmartmeetingPodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace=~"smartmeeting-prod|smartmeeting-staging"}[10m]) > 2
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Smartmeeting pod is restarting frequently"
+
+        - alert: SmartmeetingHigh5xxRate
+          expr: increase(django_http_responses_total_by_status_total{status=~"5.."}[5m]) > 5
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High 5xx rate in Django app"

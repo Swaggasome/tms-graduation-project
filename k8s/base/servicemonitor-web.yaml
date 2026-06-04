@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: smartmeeting-web
+  labels:
+    app: smartmeeting
+    component: web
+spec:
+  selector:
+    matchLabels:
+      component: web
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

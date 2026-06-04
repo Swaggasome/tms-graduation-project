@@ -1,0 +1,63 @@
+name: Install Monitoring
+
+on:
+  workflow_dispatch:
+
+jobs:
+  install-monitoring:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install yc CLI
+        run: |
+          curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+          echo "$HOME/yandex-cloud/bin" >> "$GITHUB_PATH"
+
+      - name: Authenticate yc CLI
+        run: |
+          echo '${{ secrets.YC_SA_JSON_CREDENTIALS }}' > /tmp/sa-key.json
+
+          yc config set service-account-key /tmp/sa-key.json
+          yc config set folder-id ${{ secrets.YC_FOLDER_ID }}
+          yc config set cloud-id ${{ secrets.YC_CLOUD_ID }}
+
+      - name: Get Kubernetes credentials
+        run: |
+          yc managed-kubernetes cluster get-credentials \
+            ${{ secrets.YC_K8S_CLUSTER_NAME }} \
+            --folder-id ${{ secrets.YC_FOLDER_ID }} \
+            --external
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: "v1.31.0"
+
+      - name: Add Helm repo
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Create monitoring namespace
+        run: |
+          kubectl create namespace monitoring \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Install or upgrade kube-prometheus-stack
+        run: |
+          helm upgrade --install monitoring prometheus-community/kube-prometheus-stack \
+            --namespace monitoring \
+            --values k8s/monitoring/values.yaml \
+            --rollback-on-failure \
+            --timeout 10m
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f /tmp/sa-key.json

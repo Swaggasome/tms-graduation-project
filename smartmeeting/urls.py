@@ -8,6 +8,8 @@ from apps.accounts.views import register
 from smartmeeting.views import health_check
 
 urlpatterns = [
+    path("", include("django_prometheus.urls")),
+
     path('admin/', admin.site.urls),
     path('accounts/', include('django.contrib.auth.urls')),
 
