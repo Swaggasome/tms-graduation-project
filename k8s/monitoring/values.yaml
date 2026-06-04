@@ -27,6 +27,43 @@ prometheus:
 alertmanager:
   enabled: true
 
+  alertmanagerSpec:
+    secrets:
+      - telegram-alerts
+
+  config:
+    global:
+      resolve_timeout: 5m
+
+    route:
+      receiver: telegram
+      group_by:
+        - alertname
+        - namespace
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+
+    receivers:
+      - name: telegram
+        telegram_configs:
+          - bot_token_file: /etc/alertmanager/secrets/telegram-alerts/bot-token
+            chat_id: -1003817015965
+            parse_mode: HTML
+            send_resolved: true
+            message: |
+              {{ range .Alerts }}
+              {{ if eq .Status "firing" }}🚨{{ else }}✅{{ end }}
+              <b>{{ .Status | toUpper }}</b>: <b>{{ .Labels.alertname }}</b>
+
+              <b>Namespace:</b> {{ .Labels.namespace }}
+              <b>Severity:</b> {{ .Labels.severity }}
+
+              <b>Summary:</b> {{ .Annotations.summary }}
+              <b>Description:</b> {{ .Annotations.description }}
+              {{ end }}
+
+
 kubeStateMetrics:
   enabled: true
 
