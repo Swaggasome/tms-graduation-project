@@ -4,17 +4,10 @@ grafana:
 
   service:
     type: ClusterIP
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
 
 prometheus:
   prometheusSpec:
-    retention: 7d
+    retention: 3d
 
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
@@ -48,7 +41,7 @@ alertmanager:
       - name: telegram
         telegram_configs:
           - bot_token_file: /etc/alertmanager/secrets/telegram-alerts/bot-token
-            chat_id: -1003817015965
+            chat_id: -1002123456789
             parse_mode: HTML
             send_resolved: true
             message: |
@@ -63,12 +56,20 @@ alertmanager:
               <b>Description:</b> {{ .Annotations.description }}
               {{ end }}
 
-
 kubeStateMetrics:
   enabled: true
 
 nodeExporter:
   enabled: true
+
+kubeEtcd:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubeControllerManager:
+  enabled: false
 
   resources:
     requests:
