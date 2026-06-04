@@ -9,7 +9,7 @@ resources:
 - celery.yaml
 - ingress.yaml
 - servicemonitor-web.yaml
-# - prometheusrule.yaml
+- prometheusrule.yaml
 
 generatorOptions:
   disableNameSuffixHash: true
