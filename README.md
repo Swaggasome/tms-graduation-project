@@ -76,6 +76,3 @@ kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.
 kubectl get pods -n smartmeeting
 kubectl -n smartmeeting exec -it <web pod name> -- python manage.py createsuperuser
 ```
-
-ToDo: Дополнить CI/CD workfow 
-ToDo: Добавить мониторинг приложения и кластера
