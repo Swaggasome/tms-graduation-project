@@ -41,7 +41,7 @@ alertmanager:
       - name: telegram
         telegram_configs:
           - bot_token_file: /etc/alertmanager/secrets/telegram-alerts/bot-token
-            chat_id: -1002123456789
+            chat_id: -1003817015965
             parse_mode: HTML
             send_resolved: true
             message: |
@@ -55,6 +55,9 @@ alertmanager:
               <b>Summary:</b> {{ .Annotations.summary }}
               <b>Description:</b> {{ .Annotations.description }}
               {{ end }}
+
+    inhibit_rules: []
+    templates: []
 
 kubeStateMetrics:
   enabled: true
