@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     # Сторонние приложения
     'django_celery_beat',
     'storages',
+    "django_prometheus",
 
     # НАШИ ПРИЛОЖЕНИЯ
     'apps.accounts',
@@ -55,6 +56,8 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
+
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -62,6 +65,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF = 'smartmeeting.urls'
