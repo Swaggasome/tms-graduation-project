@@ -57,9 +57,11 @@ spec:
             - containerPort: 8000
           command: ["gunicorn"]
           args:
+            - "smartmeeting.wsgi:application"
             - "--bind"
             - "0.0.0.0:8000"
-            - "smartmeeting.wsgi:application"
+            - "--workers"
+            - "3"
           envFrom:
             - configMapRef:
                 name: smartmeeting-config

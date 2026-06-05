@@ -1,0 +1,16 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: telegram-test
+spec:
+  groups:
+    - name: test
+      rules:
+        - alert: TelegramTest
+          expr: vector(1)
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Telegram integration works"
+            description: "Test alert from SmartMeeting"
