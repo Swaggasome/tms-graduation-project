@@ -14,7 +14,7 @@ spec:
     spec:
       initContainers:
         - name: run-migrations
-          image: image: smartmeeting-app
+          image: cr.yandex/crp4hm8njs66k72arusc/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "migrate"]
           envFrom:
@@ -23,7 +23,7 @@ spec:
             - secretRef:
                 name: secrets-project
         - name: run-create-rooms
-          image: image: smartmeeting-app
+          image: cr.yandex/crp4hm8njs66k72arusc/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "create_rooms"]
           envFrom:
@@ -32,7 +32,7 @@ spec:
             - secretRef:
                 name: secrets-project
         - name: run-setup-reminder-schedule
-          image: image: smartmeeting-app
+          image: cr.yandex/crp4hm8njs66k72arusc/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "setup_reminder_schedule"]
           envFrom:
@@ -41,7 +41,7 @@ spec:
             - secretRef:
                 name: secrets-project
         - name: run-collectstatic
-          image: image: smartmeeting-app
+          image: cr.yandex/crp4hm8njs66k72arusc/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "collectstatic", "--noinput"]
           envFrom:
@@ -51,15 +51,17 @@ spec:
                 name: secrets-project
       containers:
         - name: web
-          image: image: smartmeeting-app
+          image: cr.yandex/crp4hm8njs66k72arusc/smartmeeting:dev
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
           command: ["gunicorn"]
           args:
+            - "smartmeeting.wsgi:application"
             - "--bind"
             - "0.0.0.0:8000"
-            - "smartmeeting.wsgi:application"
+            - "--workers"
+            - "3"
           envFrom:
             - configMapRef:
                 name: smartmeeting-config

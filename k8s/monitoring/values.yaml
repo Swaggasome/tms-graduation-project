@@ -4,17 +4,10 @@ grafana:
 
   service:
     type: ClusterIP
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 1Gi
 
 prometheus:
   prometheusSpec:
-    retention: 7d
+    retention: 3d
 
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
@@ -63,12 +56,25 @@ alertmanager:
               <b>Description:</b> {{ .Annotations.description }}
               {{ end }}
 
+      - name: "null"
+
+    inhibit_rules: []
+    templates: []
 
 kubeStateMetrics:
   enabled: true
 
 nodeExporter:
   enabled: true
+
+kubeEtcd:
+  enabled: false
+
+kubeScheduler:
+  enabled: false
+
+kubeControllerManager:
+  enabled: false
 
   resources:
     requests:

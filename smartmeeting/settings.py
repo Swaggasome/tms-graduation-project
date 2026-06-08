@@ -14,7 +14,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-ваш-клю�
 # В production никогда не используйте значение по умолчанию!
 
 # Debug - из переменных окружения
-DEBUG = os.environ.get('DJANGO_DEBUG', 'False')
+DEBUG = os.getenv("DJANGO_DEBUG", "False").lower() in ("true", "1", "yes")
 
 # ALLOWED_HOSTS - из переменных окружения
 ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
