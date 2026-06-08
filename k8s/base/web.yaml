@@ -14,7 +14,7 @@ spec:
     spec:
       initContainers:
         - name: run-migrations
-          image: cr.yandex/crp6rleqm43d7cknihms/smartmeeting:dev
+          image: image: smartmeeting-app
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "migrate"]
           envFrom:
@@ -23,7 +23,7 @@ spec:
             - secretRef:
                 name: secrets-project
         - name: run-create-rooms
-          image: cr.yandex/crp6rleqm43d7cknihms/smartmeeting:dev
+          image: image: smartmeeting-app
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "create_rooms"]
           envFrom:
@@ -32,7 +32,7 @@ spec:
             - secretRef:
                 name: secrets-project
         - name: run-setup-reminder-schedule
-          image: cr.yandex/crp6rleqm43d7cknihms/smartmeeting:dev
+          image: image: smartmeeting-app
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "setup_reminder_schedule"]
           envFrom:
@@ -41,7 +41,7 @@ spec:
             - secretRef:
                 name: secrets-project
         - name: run-collectstatic
-          image: cr.yandex/crp6rleqm43d7cknihms/smartmeeting:dev
+          image: image: smartmeeting-app
           imagePullPolicy: IfNotPresent
           command: ["python", "manage.py", "collectstatic", "--noinput"]
           envFrom:
@@ -51,7 +51,7 @@ spec:
                 name: secrets-project
       containers:
         - name: web
-          image: cr.yandex/crp6rleqm43d7cknihms/smartmeeting:dev
+          image: image: smartmeeting-app
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
