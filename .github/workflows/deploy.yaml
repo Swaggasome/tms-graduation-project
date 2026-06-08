@@ -30,13 +30,16 @@ jobs:
             ENVIRONMENT="production"
             NAMESPACE="smartmeeting-prod"
             OVERLAY="production"
+            APP_DOMAIN="${{ secrets.PROD_APP_DOMAIN }}"
           elif [[ "$BRANCH" == "staging" ]]; then
             ENVIRONMENT="staging"
             NAMESPACE="smartmeeting-staging"
             OVERLAY="staging"
+            APP_DOMAIN="${{ secrets.STAGING_APP_DOMAIN }}"
           elif [[ "$BRANCH" =~ ^feature/ ]]; then
             ENVIRONMENT="feature"
             OVERLAY="feature"
+            APP_DOMAIN="${{ secrets.STAGING_APP_DOMAIN }}"
 
             RAW_NAME="feature-${BRANCH#feature/}"
             NAMESPACE=$(echo "$RAW_NAME" \
@@ -52,6 +55,7 @@ jobs:
           echo "ENVIRONMENT=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
           echo "NAMESPACE=$NAMESPACE" >> "$GITHUB_OUTPUT"
           echo "OVERLAY=$OVERLAY" >> "$GITHUB_OUTPUT"
+          echo "APP_DOMAIN=$APP_DOMAIN" >> "$GITHUB_OUTPUT"
 
       - name: Login to Yandex Container Registry
         uses: yc-actions/yc-cr-login@v1
@@ -165,6 +169,20 @@ jobs:
           else
             OVERLAY_PATH="k8s/overlays/$OVERLAY"
           fi
+
+          export APP_DOMAIN="${{ steps.env.outputs.APP_DOMAIN }}"
+
+          if [[ -z "$APP_DOMAIN" ]]; then
+            echo "APP_DOMAIN is required"
+            exit 1
+          fi
+
+          for file in "$OVERLAY_PATH"/ingress-patch.yaml "$OVERLAY_PATH"/configmap-patch.yaml; do
+            if [[ -f "$file" ]]; then
+              envsubst < "$file" > "$file.tmp"
+              mv "$file.tmp" "$file"
+            fi
+          done
 
           cd "$OVERLAY_PATH"
 

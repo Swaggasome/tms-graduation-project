@@ -5,7 +5,7 @@ metadata:
 data:
   DJANGO_DEBUG: "False"
   DJANGO_ALLOWED_HOSTS: "*"
-  DJANGO_CSRF_TRUSTED_ORIGINS: "https://smartmeeting.galkin.online,https://smartmeeting.galkin.online"
+  DJANGO_CSRF_TRUSTED_ORIGINS: "https://${APP_DOMAIN},http://${APP_DOMAIN}"
   DJANGO_CSRF_COOKIE_SECURE: "True"
   DJANGO_SESSION_COOKIE_SECURE: "True"
   DJANGO_SECURE_SSL_REDIRECT: "True"
