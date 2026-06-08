@@ -87,6 +87,24 @@ jobs:
         with:
           version: "v1.31.0"
 
+      - name: Install cluster prerequisites
+        run: |
+          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.5/cert-manager.yaml
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
+
+      - name: Apply cluster configuration
+        env:
+          CERT_MANAGER_EMAIL: ${{ secrets.CERT_MANAGER_EMAIL }}
+        run: |
+          if [[ -z "$CERT_MANAGER_EMAIL" ]]; then
+            echo "CERT_MANAGER_EMAIL secret is required"
+            exit 1
+          fi
+
+          cp -r k8s/cluster /tmp/k8s-cluster
+          envsubst < k8s/cluster/cluster-issuers.yaml > /tmp/k8s-cluster/cluster-issuers.yaml
+          kubectl apply -k /tmp/k8s-cluster
+
       - name: Create namespace
         run: |
           kubectl create namespace "${{ steps.env.outputs.NAMESPACE }}" \
@@ -151,7 +169,7 @@ jobs:
           cd "$OVERLAY_PATH"
 
           kustomize edit set namespace "$NAMESPACE"
-          kustomize edit set image "$IMAGE_NAME=$IMAGE_NAME:$IMAGE_TAG"
+          kustomize edit set image smartmeeting-app="$IMAGE_NAME:$IMAGE_TAG"
 
           echo "OVERLAY_PATH=$OVERLAY_PATH" >> "$GITHUB_ENV"
 
@@ -177,3 +195,4 @@ jobs:
           rm -f /tmp/sa-key.json
           rm -f k8s/base/.env.secret
           rm -rf k8s/overlays/temp
+          rm -rf /tmp/k8s-cluster
