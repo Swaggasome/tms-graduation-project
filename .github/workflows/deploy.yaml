@@ -30,13 +30,16 @@ jobs:
             ENVIRONMENT="production"
             NAMESPACE="smartmeeting-prod"
             OVERLAY="production"
+            APP_DOMAIN="${{ secrets.PROD_APP_DOMAIN }}"
           elif [[ "$BRANCH" == "staging" ]]; then
             ENVIRONMENT="staging"
             NAMESPACE="smartmeeting-staging"
             OVERLAY="staging"
+            APP_DOMAIN="${{ secrets.STAGING_APP_DOMAIN }}"
           elif [[ "$BRANCH" =~ ^feature/ ]]; then
             ENVIRONMENT="feature"
             OVERLAY="feature"
+            APP_DOMAIN="${{ secrets.STAGING_APP_DOMAIN }}"
 
             RAW_NAME="feature-${BRANCH#feature/}"
             NAMESPACE=$(echo "$RAW_NAME" \
@@ -52,6 +55,7 @@ jobs:
           echo "ENVIRONMENT=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
           echo "NAMESPACE=$NAMESPACE" >> "$GITHUB_OUTPUT"
           echo "OVERLAY=$OVERLAY" >> "$GITHUB_OUTPUT"
+          echo "APP_DOMAIN=$APP_DOMAIN" >> "$GITHUB_OUTPUT"
 
       - name: Login to Yandex Container Registry
         uses: yc-actions/yc-cr-login@v1
@@ -86,6 +90,24 @@ jobs:
         uses: azure/setup-kubectl@v4
         with:
           version: "v1.31.0"
+
+      - name: Install cluster prerequisites
+        run: |
+          kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.5/cert-manager.yaml
+          kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
+
+      - name: Apply cluster configuration
+        env:
+          CERT_MANAGER_EMAIL: ${{ secrets.CERT_MANAGER_EMAIL }}
+        run: |
+          if [[ -z "$CERT_MANAGER_EMAIL" ]]; then
+            echo "CERT_MANAGER_EMAIL secret is required"
+            exit 1
+          fi
+
+          cp -r k8s/cluster /tmp/k8s-cluster
+          envsubst < k8s/cluster/cluster-issuers.yaml > /tmp/k8s-cluster/cluster-issuers.yaml
+          kubectl apply -k /tmp/k8s-cluster
 
       - name: Create namespace
         run: |
@@ -148,10 +170,24 @@ jobs:
             OVERLAY_PATH="k8s/overlays/$OVERLAY"
           fi
 
+          export APP_DOMAIN="${{ steps.env.outputs.APP_DOMAIN }}"
+
+          if [[ -z "$APP_DOMAIN" ]]; then
+            echo "APP_DOMAIN is required"
+            exit 1
+          fi
+
+          for file in "$OVERLAY_PATH"/ingress-patch.yaml "$OVERLAY_PATH"/configmap-patch.yaml; do
+            if [[ -f "$file" ]]; then
+              envsubst < "$file" > "$file.tmp"
+              mv "$file.tmp" "$file"
+            fi
+          done
+
           cd "$OVERLAY_PATH"
 
           kustomize edit set namespace "$NAMESPACE"
-          kustomize edit set image "$IMAGE_NAME=$IMAGE_NAME:$IMAGE_TAG"
+          kustomize edit set image smartmeeting-app="$IMAGE_NAME:$IMAGE_TAG"
 
           echo "OVERLAY_PATH=$OVERLAY_PATH" >> "$GITHUB_ENV"
 
@@ -177,3 +213,4 @@ jobs:
           rm -f /tmp/sa-key.json
           rm -f k8s/base/.env.secret
           rm -rf k8s/overlays/temp
+          rm -rf /tmp/k8s-cluster

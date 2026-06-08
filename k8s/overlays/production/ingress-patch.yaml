@@ -8,10 +8,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - smartmeeting.galkin.online
+        - ${APP_DOMAIN}
       secretName: smartmeeting-tls
   rules:
-    - host: smartmeeting.galkin.online
+    - host: ${APP_DOMAIN}
       http:
         paths:
           - path: /
