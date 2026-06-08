@@ -4,7 +4,7 @@ metadata:
   name: letsencrypt-prod
 spec:
   acme:
-    email: v.g.galkin@gmail.com
+    email: ${CERT_MANAGER_EMAIL}
     server: https://acme-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: letsencrypt-prod-private-key
@@ -19,7 +19,7 @@ metadata:
   name: letsencrypt-staging
 spec:
   acme:
-    email: v.g.galkin@gmail.com
+    email: ${CERT_MANAGER_EMAIL}
     server: https://acme-staging-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: letsencrypt-staging-private-key
