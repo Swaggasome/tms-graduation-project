@@ -1,14 +1,9 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
-    restart: always
-    command: redis-server --bind 0.0.0.0 --protected-mode no
-    networks:
-      - smartmeeting_network
+    restart: unless-stopped
 
   postgres:
     image: postgres:15
@@ -20,25 +15,29 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: always
-    networks:
-      - smartmeeting_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d smartmeeting"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
-      - redis
-    environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/smartmeeting
-      REDIS_URL: redis://redis:6379
-    networks:
-      - smartmeeting_network
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    env_file:
+      - .env
 
   celery:
     build: .
@@ -46,13 +45,14 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - postgres
-      - redis
-    environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/smartmeeting
-      REDIS_URL: redis://redis:6379  # Используем имя сервиса, не localhost
-    networks:
-      - smartmeeting_network
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
+    env_file:
+      - .env
 
   celery-beat:
     build: .
@@ -60,18 +60,14 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - postgres
-      - redis
-      - celery
-    environment:
-      DATABASE_URL: postgres://postgres:postgres@postgres:5432/smartmeeting
-      REDIS_URL: redis://redis:6379  # Используем имя сервиса, не localhost
-    networks:
-      - smartmeeting_network
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
+    env_file:
+      - .env
 
 volumes:
   postgres_data:
-
-networks:
-  smartmeeting_network:
-    driver: bridge
