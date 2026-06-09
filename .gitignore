@@ -8,3 +8,13 @@ logs/
 .env
 staticfiles/
 k8s/.env.secret
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+staticfiles/
+media/
+postgres_data/
+.vscode/
