@@ -1,270 +1,395 @@
 # SmartMeeting
 
-Web-система бронирования переговорных комнат в офисе.
+<p align="center">
+  <b>SmartMeeting</b> — web-система бронирования переговорных комнат с промышленным CI/CD, Kubernetes-деплоем и инфраструктурой в Yandex Cloud.
+</p>
 
-Проект реализует календарь занятости ресурсов с запретом двойного бронирования, асинхронные задачи через Celery/Redis и экспорт событий в `.ics` для импорта во внешние календари.
+<p align="center">
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.x-blue">
+  <img alt="Django" src="https://img.shields.io/badge/Django-4.2-green">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-15-blue">
+  <img alt="Redis" src="https://img.shields.io/badge/Redis-7-red">
+  <img alt="Kubernetes" src="https://img.shields.io/badge/Kubernetes-Yandex%20Cloud-326CE5">
+  <img alt="Terraform" src="https://img.shields.io/badge/Terraform-IaC-844FBA">
+</p>
+
+---
+
+## Содержание
+
+- [Назначение проекта](#назначение-проекта)
+- [Репозитории проекта](#репозитории-проекта)
+- [Стек](#стек)
+- [Архитектура](#архитектура)
+- [Git flow и правила веток](#git-flow-и-правила-веток)
+- [Локальный запуск приложения](#локальный-запуск-приложения)
+- [Подготовка Terraform backend](#подготовка-terraform-backend)
+- [Создание основной инфраструктуры](#создание-основной-инфраструктуры)
+- [GitHub Secrets](#github-secrets)
+- [Первичное развертывание стенда](#первичное-развертывание-стенда)
+- [CI/CD](#cicd)
+- [Работа с feature-окружениями](#работа-с-feature-окружениями)
+- [Мониторинг](#мониторинг)
+- [Проверка после деплоя](#проверка-после-деплоя)
+- [Типовые проблемы](#типовые-проблемы)
+
+---
+
+## Назначение проекта
+
+SmartMeeting предназначен для бронирования переговорных комнат в офисе.
+
+Система реализует календарь занятости переговорных комнат, запрет двойного бронирования, асинхронные задачи через Celery и Redis, периодические задачи через Celery Beat, PostgreSQL как основное хранилище, экспорт событий в `.ics`, staging/production/feature окружения в Kubernetes и автоматический деплой через GitHub Actions.
+
+---
+
+## Репозитории проекта
+
+| Репозиторий | Назначение |
+|---|---|
+| `tms-graduation-project` | Django-приложение, Dockerfile, docker-compose, Kubernetes-манифесты, GitHub Actions CI/CD |
+| `tms-graduation-project-infra-backend` | Bootstrap Terraform backend: S3-compatible bucket в Yandex Object Storage для хранения Terraform state |
+| `tms-graduation-project-infra` | Основная инфраструктура Yandex Cloud: Managed Kubernetes, node group, VPC, Container Registry, Object Storage, service accounts, IAM-роли |
+
+Порядок работы:
+
+```text
+1. tms-graduation-project-infra-backend
+   └─ создаёт backend для Terraform state
+
+2. tms-graduation-project-infra
+   └─ создаёт основную облачную инфраструктуру
+
+3. tms-graduation-project
+   └─ собирает и деплоит приложение в Kubernetes
+```
+
+---
 
 ## Стек
 
-- Python / Django 4.2
-- PostgreSQL 15
-- Redis 7
-- Celery / Celery Beat
-- Gunicorn
-- Docker / Docker Compose
-- Kubernetes
-- Kustomize
-- Yandex Cloud Managed Kubernetes
-- Yandex Container Registry
-- cert-manager
-- ingress-nginx
+### Application
 
-## Структура репозитория
+| Компонент | Использование |
+|---|---|
+| Python | Runtime приложения |
+| Django 4.2 | Web framework |
+| PostgreSQL 15 | Основная БД |
+| Redis 7 | Broker/cache для Celery |
+| Celery | Асинхронные задачи |
+| Celery Beat | Периодические задачи |
+| Gunicorn | WSGI-сервер |
+| Docker / Docker Compose | Локальная разработка и упаковка приложения |
 
-```text
-.
-├── .github/workflows/deploy.yaml      # CI/CD workflow для сборки и деплоя
-├── Dockerfile                         # Docker-образ приложения
-├── docker-compose.yml                 # Локальное окружение
-├── k8s/
-│   ├── base/                          # Базовые Kubernetes-манифесты
-│   ├── cluster/                       # Кластерные ресурсы: ClusterIssuer
-│   └── overlays/
-│       ├── staging/                   # Staging overlay
-│       ├── production/                # Production overlay
-│       └── feature/                   # Feature overlay
-├── manage.py
-└── requirements.txt
+### Infrastructure / Platform
+
+| Компонент | Использование |
+|---|---|
+| Terraform | Создание облачной инфраструктуры |
+| Yandex Cloud Managed Kubernetes | Kubernetes-кластер приложения |
+| Yandex Container Registry | Хранение Docker-образов |
+| Yandex Object Storage | Terraform state и static files приложения |
+| VPC / Subnet | Сетевая инфраструктура |
+| Kubernetes / Kustomize | Деплой приложения и overlays окружений |
+| ingress-nginx | Входящий HTTP/HTTPS traffic |
+| cert-manager | Выпуск TLS-сертификатов |
+| kube-prometheus-stack | Monitoring stack |
+| GitHub Actions | CI/CD pipeline |
+
+---
+
+## Архитектура
+
+```mermaid
+flowchart TB
+    Dev[Developer] --> PR[Pull Request]
+    PR --> GH[GitHub Actions]
+    GH --> Build[Docker build]
+    Build --> CR[Yandex Container Registry]
+    GH --> YC[Yandex Cloud auth]
+    YC --> K8S[Managed Kubernetes]
+    K8S --> NGINX[ingress-nginx]
+    NGINX --> WEB[Django web]
+    WEB --> PG[(PostgreSQL)]
+    WEB --> Redis[(Redis)]
+    Redis --> CW[Celery worker]
+    Redis --> CB[Celery beat]
+    WEB --> S3[Yandex Object Storage static files]
+    K8S --> MON[kube-prometheus-stack]
+    MON --> Grafana[Grafana]
+    MON --> Alertmanager[Alertmanager Telegram]
 ```
 
-## Локальный запуск через Docker Compose
+| Branch | Environment | Namespace | Kustomize overlay | Domain |
+|---|---|---|---|---|
+| `main` | production | `smartmeeting-prod` | `k8s/overlays/production` | `PROD_APP_DOMAIN` |
+| `staging` | staging | `smartmeeting-staging` | `k8s/overlays/staging` | `STAGING_APP_DOMAIN` |
+| `feature/**` | feature | `feature-<branch>` | `k8s/overlays/feature` через временный overlay | staging domain / port-forward |
 
-### 1. Поднять окружение
+---
+
+## Git flow и правила веток
+
+| Ветка | Назначение | Правило обновления |
+|---|---|---|
+| `main` | Production | Только через Pull Request |
+| `staging` | Pre-production / staging | Только через Pull Request. Исключение: первичное развертывание staging |
+| `feature/**` | Разработка и проверка отдельных задач | Push разрешён, создаётся временное feature-окружение |
+
+Ветки `main` и `staging` не должны обновляться прямым push. Исключение допускается только для `staging` при самом первом развертывании стенда.
+
+Рекомендуемый процесс:
+
+```text
+feature/<task>
+  └─ Pull Request → staging
+       └─ Pull Request → main
+```
+
+---
+
+## Локальный запуск приложения
+
+### Требования
+
+- Docker;
+- Docker Compose;
+- Git.
+
+### Запуск
 
 ```bash
+git clone https://github.com/Swaggasome/tms-graduation-project.git
+cd tms-graduation-project
 docker compose up --build
 ```
 
-Будут запущены:
+Docker Compose поднимает:
 
-- `web` — Django-приложение на порту `8000`;
-- `postgres` — база данных PostgreSQL на порту `5432`;
-- `redis` — Redis на порту `6379`;
-- `celery` — Celery worker;
-- `celery-beat` — планировщик периодических задач.
+| Service | Назначение | Port |
+|---|---|---|
+| `web` | Django-приложение | `8000` |
+| `postgres` | PostgreSQL 15 | `5432` |
+| `redis` | Redis 7 | `6379` |
+| `celery` | Celery worker | — |
+| `celery-beat` | Celery Beat scheduler | — |
 
-### 2. Выполнить миграции
+Выполнить первичную настройку:
 
 ```bash
 docker compose exec web python manage.py migrate
-```
-
-### 3. Создать переговорные комнаты
-
-```bash
 docker compose exec web python manage.py create_rooms
-```
-
-### 4. Настроить расписание напоминаний
-
-```bash
 docker compose exec web python manage.py setup_reminder_schedule
-```
-
-### 5. Создать администратора
-
-```bash
 docker compose exec web python manage.py createsuperuser
 ```
 
-### 6. Открыть приложение
+Открыть приложение:
 
 ```text
 http://localhost:8000
 ```
 
-## CI/CD
+---
 
-Деплой выполняется GitHub Actions workflow:
+## Подготовка Terraform backend
 
-```text
-.github/workflows/deploy.yaml
+Bootstrap выполняется из репозитория `tms-graduation-project-infra-backend`.
+
+```bash
+git clone https://github.com/Swaggasome/tms-graduation-project-infra-backend.git
+cd tms-graduation-project-infra-backend
 ```
 
-Workflow запускается при push в ветки:
+Создать `terraform.tfvars`:
 
-```text
-main
-staging
-feature/**
+```hcl
+cloud_id        = "<CLOUD ID>"
+folder_id       = "<FOLDER ID>"
+bucket_name     = "<BUCKET NAME>"
+token           = "<YANDEX CLOUD TOKEN>"
+service_account = "<SERVICE ACCOUNT NAME>"
 ```
 
-Логика окружений:
+Применить Terraform:
 
-| Ветка | Окружение | Namespace | Overlay |
-|---|---|---|---|
-| `main` | production | `smartmeeting-prod` | `k8s/overlays/production` |
-| `staging` | staging | `smartmeeting-staging` | `k8s/overlays/staging` |
-| `feature/**` | feature | генерируется из имени ветки | `k8s/overlays/feature` |
+```bash
+terraform init
+terraform apply
+```
 
-Workflow выполняет:
+Будет создано:
 
-1. Сборку Docker-образа.
-2. Push образа в Yandex Container Registry.
-3. Аутентификацию в Yandex Cloud.
-4. Получение kubeconfig для Managed Kubernetes.
-5. Установку `cert-manager`.
-6. Установку `ingress-nginx`.
-7. Применение кластерных ресурсов из `k8s/cluster`.
-8. Создание namespace.
-9. Генерацию Kubernetes Secret из GitHub Secrets.
-10. Подготовку overlay через Kustomize.
-11. Деплой приложения в Kubernetes.
-12. Проверку rollout статуса deployment-ов.
+- S3-compatible bucket для Terraform state;
+- service account для доступа к Object Storage;
+- IAM-права `storage.editor`;
+- static access key / secret key.
+
+Получить ключи backend:
+
+```bash
+ACCESS_KEY=$(terraform output -raw access_key)
+SECRET_KEY=$(terraform output -raw secret_key)
+```
+
+---
+
+## Создание основной инфраструктуры
+
+Основная инфраструктура создаётся из репозитория `tms-graduation-project-infra`.
+
+```bash
+git clone https://github.com/Swaggasome/tms-graduation-project-infra.git
+cd tms-graduation-project-infra
+```
+
+Инициализировать Terraform с remote backend:
+
+```bash
+terraform init \
+  -backend-config="access_key=$ACCESS_KEY" \
+  -backend-config="secret_key=$SECRET_KEY" \
+  -reconfigure
+```
+
+Очистить переменные:
+
+```bash
+unset ACCESS_KEY SECRET_KEY
+```
+
+Создать `terraform.tfvars`:
+
+```hcl
+cloud_id        = "<CLOUD ID>"
+folder_id       = "<FOLDER ID>"
+bucket_name     = "<STATIC FILES BUCKET NAME>"
+token           = "<YANDEX CLOUD TOKEN>"
+service_account = "<SERVICE ACCOUNT NAME>"
+ssh_public_key  = "<YOUR PUBLIC SSH KEY>"
+```
+
+Применить Terraform:
+
+```bash
+terraform plan
+terraform apply
+```
+
+Будет создано:
+
+- Managed Kubernetes cluster;
+- Kubernetes node group;
+- VPC network и subnet;
+- Yandex Container Registry;
+- Object Storage bucket для static files;
+- service accounts для Kubernetes, node group, GitHub Actions и registry;
+- static access keys для static files bucket;
+- IAM-роли для service accounts.
+
+Критичные outputs:
+
+| Output | GitHub Secret |
+|---|---|
+| `yc_sa_json_credentials_raw` | `YC_SA_JSON_CREDENTIALS` |
+| `registry_id` | `CR_REGISTRY_ID` |
+| `static_files_access_key` | `YC_STORAGE_ACCESS_KEY` |
+| `static_files_secret_key` | `YC_STORAGE_SECRET_KEY` |
+| `k8s_id` | `YC_K8S_CLUSTER_ID` |
+
+Пример копирования JSON-ключа:
+
+```bash
+terraform output -raw yc_sa_json_credentials_raw > key.json
+# скопировать содержимое key.json в GitHub Secret YC_SA_JSON_CREDENTIALS
+rm -f key.json
+```
+
+---
 
 ## GitHub Secrets
 
-В репозитории должны быть настроены следующие secrets.
+Secrets задаются в `tms-graduation-project`:
 
-### Yandex Cloud / Container Registry
+```text
+Settings → Secrets and variables → Actions → New repository secret
+```
 
-| Secret | Описание |
+### Yandex Cloud / Container Registry / Kubernetes
+
+| Secret | Назначение |
 |---|---|
-| `YC_SA_JSON_CREDENTIALS` | JSON-ключ сервисного аккаунта Yandex Cloud |
-| `YC_CLOUD_ID` | ID облака |
-| `YC_FOLDER_ID` | ID каталога |
-| `YC_K8S_CLUSTER_NAME` | ID или имя Managed Kubernetes кластера |
+| `YC_SA_JSON_CREDENTIALS` | JSON-ключ service account для GitHub Actions |
+| `YC_CLOUD_ID` | ID Yandex Cloud |
+| `YC_FOLDER_ID` | ID folder |
+| `YC_K8S_CLUSTER_ID` | ID Managed Kubernetes cluster |
 | `CR_REGISTRY_ID` | ID Yandex Container Registry |
-| `CR_REPOSITORY` | Имя репозитория образа, например `smartmeeting` |
+| `CR_REPOSITORY` | Имя Docker repository, например `smartmeeting` |
 
-Рекомендуется указывать в `YC_K8S_CLUSTER_NAME` именно ID кластера, а не имя.
+### Domains / TLS
 
-### Домены и TLS
-
-| Secret | Пример |
+| Secret | Назначение |
 |---|---|
-| `CERT_MANAGER_EMAIL` | `admin@example.com` |
-| `PROD_APP_DOMAIN` | `smartmeeting-app.ru` |
-| `STAGING_APP_DOMAIN` | `staging.smartmeeting-app.ru` |
+| `CERT_MANAGER_EMAIL` | Email для Let's Encrypt ClusterIssuer |
+| `PROD_APP_DOMAIN` | Production domain |
+| `STAGING_APP_DOMAIN` | Staging domain |
 
-`CERT_MANAGER_EMAIL` используется для Let's Encrypt ClusterIssuer.
+### Object Storage / SMTP
 
-`PROD_APP_DOMAIN` и `STAGING_APP_DOMAIN` используются для Ingress host и Django CSRF trusted origins.
+| Secret | Назначение |
+|---|---|
+| `YC_STORAGE_BUCKET_NAME` | Bucket для static files |
+| `YC_STORAGE_ACCESS_KEY` | Static access key |
+| `YC_STORAGE_SECRET_KEY` | Static secret key |
+| `EMAIL_HOST_USER` | Gmail-аккаунт для отправки уведомлений |
+| `EMAIL_HOST_PASSWORD` | Gmail app password |
 
-### Production Django / DB / S3
+### Production
 
-| Secret | Описание |
+| Secret | Назначение |
 |---|---|
 | `PROD_DB_USER` | Пользователь PostgreSQL |
 | `PROD_DB_PASSWORD` | Пароль PostgreSQL |
 | `PROD_DB_DATABASE` | Имя БД |
 | `PROD_DJANGO_SECRET_KEY` | Django secret key |
-| `EMAIL_HOST_USER` | Пользователь SMTP |
-| `EMAIL_HOST_PASSWORD` | Пароль SMTP |
-| `YC_STORAGE_BUCKET_NAME` | Имя Object Storage bucket |
-| `YC_STORAGE_ACCESS_KEY` | Static access key |
-| `YC_STORAGE_SECRET_KEY` | Static secret key |
 
 ### Staging / Feature
 
-| Secret | Описание |
+| Secret | Назначение |
 |---|---|
 | `STAGING_DB_USER` | Пользователь PostgreSQL |
 | `STAGING_DB_PASSWORD` | Пароль PostgreSQL |
 | `STAGING_DB_DATABASE` | Имя БД |
 | `STAGING_DJANGO_SECRET_KEY` | Django secret key |
 
-Feature-окружения используют staging-настройки БД и домена, если в workflow не задана отдельная логика.
+---
 
-## Инфраструктура
+## Первичное развертывание стенда
 
-Terraform-код инфраструктуры находится в отдельном репозитории:
-
-```text
-https://github.com/Swaggasome/tms-graduation-project-infra.git
-```
-
-После применения Terraform нужно получить значения outputs и добавить их в GitHub Secrets.
-
-Пример получения JSON-ключа сервисного аккаунта:
+Настроить доступ к Kubernetes:
 
 ```bash
-terraform output -raw yc_sa_json_credentials_raw > key.json
+yc managed-kubernetes cluster get-credentials \
+  --id <YC_K8S_CLUSTER_ID> \
+  --external \
+  --force
+
+kubectl get nodes
 ```
 
-Значение файла `key.json` нужно сохранить в GitHub Secret:
-
-```text
-YC_SA_JSON_CREDENTIALS
-```
-
-После сохранения секрета локальный файл с ключом нужно удалить:
+Установить cluster-level ресурсы приложения:
 
 ```bash
-rm -f key.json
+kubectl apply -k k8s/cluster/.
 ```
 
-## Ручная проверка доступа к Kubernetes
-
-Перед запуском workflow можно локально проверить, что кластер доступен:
-
-```bash
-yc config set cloud-id <YC_CLOUD_ID>
-yc config set folder-id <YC_FOLDER_ID>
-yc config set service-account-key key.json
-
-yc managed-kubernetes cluster list --folder-id <YC_FOLDER_ID>
-```
-
-Получить kubeconfig:
-
-```bash
-yc managed-kubernetes cluster get-credentials <YC_K8S_CLUSTER_NAME> \
-  --folder-id <YC_FOLDER_ID> \
-  --external
-```
-
-Если возникает ошибка:
-
-```text
-cluster with id or name "..." not found
-```
-
-проверьте:
-
-- правильность `YC_K8S_CLUSTER_NAME`;
-- правильность `YC_FOLDER_ID`;
-- права сервисного аккаунта;
-- что кластер находится именно в указанном каталоге.
-
-## Ручная установка кластерных компонентов
-
-Workflow делает это автоматически, но вручную команды выглядят так:
+При необходимости установить `cert-manager` и `ingress-nginx` вручную:
 
 ```bash
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.5/cert-manager.yaml
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
 ```
 
-Проверка:
-
-```bash
-kubectl get pods -n cert-manager
-kubectl get pods -n ingress-nginx
-```
-
-Применение кластерных ресурсов:
-
-```bash
-export CERT_MANAGER_EMAIL=admin@example.com
-cp -r k8s/cluster /tmp/k8s-cluster
-envsubst < k8s/cluster/cluster-issuers.yaml > /tmp/k8s-cluster/cluster-issuers.yaml
-kubectl apply -k /tmp/k8s-cluster
-```
-
-## DNS
-
-После установки `ingress-nginx` получите внешний IP LoadBalancer:
+Получить внешний IP LoadBalancer:
 
 ```bash
 kubectl get svc ingress-nginx-controller \
@@ -272,163 +397,297 @@ kubectl get svc ingress-nginx-controller \
   -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 ```
 
-Создайте DNS A-записи:
+Создать DNS A-записи:
 
 ```text
-<PROD_APP_DOMAIN>      A    <INGRESS_EXTERNAL_IP>
-<STAGING_APP_DOMAIN>   A    <INGRESS_EXTERNAL_IP>
+smartmeeting.<domain>          A    <INGRESS_EXTERNAL_IP>
+staging.smartmeeting.<domain>  A    <INGRESS_EXTERNAL_IP>
 ```
 
-Пример:
+Подготовить мониторинг:
+
+```bash
+kubectl create namespace monitoring
+kubectl create secret generic telegram-alerts \
+  -n monitoring \
+  --from-literal=bot-token='<TELEGRAM_BOT_TOKEN>' \
+  --from-literal=chat-id='<TELEGRAM_CHAT_ID>'
+```
+
+Первичный deploy staging. Это единственный допустимый случай прямого push в `staging`:
+
+```bash
+git checkout staging
+git add .
+git commit -m "Init staging deployment"
+git push origin HEAD
+```
+
+Создать superuser в staging:
+
+```bash
+kubectl get pods -n smartmeeting-staging
+kubectl exec -it deployment/web -n smartmeeting-staging -- python manage.py createsuperuser
+```
+
+Продвижение в production выполняется через Pull Request `staging → main`.
+
+После production deploy:
+
+```bash
+kubectl get pods -n smartmeeting-prod
+kubectl exec -it deployment/web -n smartmeeting-prod -- python manage.py createsuperuser
+```
+
+---
+
+## CI/CD
+
+CI/CD workflow находится в `.github/workflows/deploy.yaml`.
+
+Workflow запускается при push в:
 
 ```text
-smartmeeting-app.ru           A    158.160.XX.XX
-staging.smartmeeting-app.ru   A    158.160.XX.XX
+main
+staging
+feature/**
 ```
 
-## Kubernetes deploy вручную
+И также вручную через `workflow_dispatch`.
 
-Обычно деплой выполняется GitHub Actions. Для ручной проверки можно использовать Kustomize.
+```mermaid
+flowchart LR
+    A[Push / workflow_dispatch] --> B[Checkout]
+    B --> C[Detect environment]
+    C --> D[Login to Yandex Container Registry]
+    D --> E[Docker build]
+    E --> F[Docker push]
+    F --> G[Install yc CLI]
+    G --> H[Authenticate yc CLI]
+    H --> I[Get Kubernetes credentials]
+    I --> J[Install kubectl]
+    J --> K[Install cluster prerequisites]
+    K --> L[Apply cluster configuration]
+    L --> M[Create namespace]
+    M --> N[Create .env.secret]
+    N --> O[Prepare Kustomize overlay]
+    O --> P[Validate manifests]
+    P --> Q[Deploy]
+    Q --> R[Wait for deployments]
+    R --> S[Cleanup]
+```
 
-### Staging
+Workflow выполняет:
+
+1. Определение окружения по ветке.
+2. Сборку Docker-образа.
+3. Push в Yandex Container Registry:
+
+   ```text
+   cr.yandex/<CR_REGISTRY_ID>/<CR_REPOSITORY>:<GITHUB_SHA>
+   ```
+
+4. Аутентификацию в Yandex Cloud.
+5. Получение kubeconfig.
+6. Установку `cert-manager` и `ingress-nginx`.
+7. Применение `k8s/cluster`.
+8. Создание namespace.
+9. Генерацию временного `k8s/base/.env.secret` из GitHub Secrets.
+10. Подготовку Kustomize overlay.
+11. Проверку манифестов через `kubectl apply --dry-run=client`.
+12. Деплой через `kubectl apply -k`.
+13. Ожидание rollout `web`, `celery-worker`, `celery-beat`.
+14. Удаление временных файлов.
+
+Для `main` и `staging` рекомендуется включить GitHub Rulesets / Branch protection:
+
+- запрет direct push;
+- обязательный Pull Request;
+- обязательный status check `validate`;
+- запрет force push;
+- запрет удаления ветки.
+
+---
+
+## Работа с feature-окружениями
+
+Push в ветку:
+
+```text
+feature/<task-name>
+```
+
+создаёт namespace:
+
+```text
+feature-<task-name>
+```
+
+Проверка:
 
 ```bash
-export APP_DOMAIN=staging.smartmeeting-app.ru
-export IMAGE_NAME=cr.yandex/<CR_REGISTRY_ID>/smartmeeting
-export IMAGE_TAG=<TAG>
-
-cp -r k8s/overlays/staging /tmp/smartmeeting-staging
-
-for file in /tmp/smartmeeting-staging/ingress-patch.yaml /tmp/smartmeeting-staging/configmap-patch.yaml; do
-  envsubst < "$file" > "$file.tmp"
-  mv "$file.tmp" "$file"
-done
-
-cd /tmp/smartmeeting-staging
-kustomize edit set namespace smartmeeting-staging
-kustomize edit set image smartmeeting-app="$IMAGE_NAME:$IMAGE_TAG"
-kubectl apply -k .
+kubectl get pods -n feature-<task-name>
+kubectl port-forward -n feature-<task-name> svc/web 8000:8000
 ```
 
-### Production
+Открыть:
+
+```text
+http://localhost:8000
+```
+
+Удаление ветки:
 
 ```bash
-export APP_DOMAIN=smartmeeting-app.ru
-export IMAGE_NAME=cr.yandex/<CR_REGISTRY_ID>/smartmeeting
-export IMAGE_TAG=<TAG>
-
-cp -r k8s/overlays/production /tmp/smartmeeting-production
-
-for file in /tmp/smartmeeting-production/ingress-patch.yaml /tmp/smartmeeting-production/configmap-patch.yaml; do
-  envsubst < "$file" > "$file.tmp"
-  mv "$file.tmp" "$file"
-done
-
-cd /tmp/smartmeeting-production
-kustomize edit set namespace smartmeeting-prod
-kustomize edit set image smartmeeting-app="$IMAGE_NAME:$IMAGE_TAG"
-kubectl apply -k .
+git branch -D feature/<task-name>
+git push origin --delete feature/<task-name>
 ```
+
+Удаление namespace при необходимости:
+
+```bash
+kubectl delete namespace feature-<task-name>
+```
+
+---
+
+## Мониторинг
+
+Monitoring namespace:
+
+```text
+monitoring
+```
+
+Компоненты:
+
+- Prometheus;
+- Grafana;
+- Alertmanager;
+- Telegram receiver;
+- dashboards для Kubernetes / Django.
+
+Alertmanager:
+
+```bash
+kubectl port-forward -n monitoring \
+  svc/monitoring-kube-prometheus-alertmanager \
+  9093:9093
+```
+
+Grafana:
+
+```bash
+kubectl port-forward -n monitoring svc/monitoring-grafana 3000:80
+```
+
+Рекомендуемые dashboards:
+
+```text
+15757
+20693
+```
+
+Prometheus:
+
+```bash
+kubectl port-forward -n monitoring \
+  svc/monitoring-kube-prometheus-prometheus \
+  9090:9090
+```
+
+---
 
 ## Проверка после деплоя
-
-Проверить pods:
 
 ```bash
 kubectl get pods -n smartmeeting-staging
 kubectl get pods -n smartmeeting-prod
-```
 
-Проверить deployments:
-
-```bash
 kubectl rollout status deployment/web -n smartmeeting-staging
 kubectl rollout status deployment/celery-worker -n smartmeeting-staging
 kubectl rollout status deployment/celery-beat -n smartmeeting-staging
-```
 
-Проверить ingress:
-
-```bash
 kubectl get ingress -A
-```
-
-Проверить сертификаты:
-
-```bash
 kubectl get certificate -A
 kubectl get challenge -A
 kubectl get order -A
-```
 
-Посмотреть логи web:
-
-```bash
 kubectl logs -n smartmeeting-staging deployment/web
+kubectl logs -n smartmeeting-staging deployment/celery-worker
+kubectl logs -n smartmeeting-staging deployment/celery-beat
 ```
 
-Создать администратора в Kubernetes:
-
-```bash
-kubectl -n smartmeeting-staging exec -it deployment/web -- python manage.py createsuperuser
-```
+---
 
 ## Типовые проблемы
 
 ### `cluster with id or name "..." not found`
 
-Причина: неправильный `YC_K8S_CLUSTER_NAME`, неправильный `YC_FOLDER_ID` или у сервисного аккаунта нет доступа к кластеру.
+Проверить `YC_K8S_CLUSTER_ID`, `YC_FOLDER_ID`, права service account и расположение кластера в нужном folder.
 
-Проверка:
+### `ImagePullBackOff`
+
+Проверить `CR_REGISTRY_ID`, `CR_REPOSITORY`, наличие образа в registry и права node service account.
+
+### `CrashLoopBackOff` у `web`
 
 ```bash
-yc managed-kubernetes cluster list --folder-id <YC_FOLDER_ID>
+kubectl logs -n smartmeeting-staging deployment/web --previous
 ```
+
+Частые причины:
+
+- неверный `DJANGO_SECRET_KEY`;
+- ошибка подключения к PostgreSQL;
+- не выполнены миграции;
+- неверные Object Storage credentials;
+- неверный domain / CSRF trusted origins.
 
 ### Сертификат не выпускается
 
-Проверить:
+```bash
+kubectl get certificate -A
+kubectl get challenge -A
+kubectl describe challenge -n <namespace> <challenge-name>
+```
+
+Проверить DNS A-запись, ClusterIssuer, `CERT_MANAGER_EMAIL` и ingress host.
+
+### Alertmanager: `undefined receiver "null" used in route`
+
+В route должен использоваться существующий receiver, например `telegram`, а не `null`.
 
 ```bash
-kubectl describe certificate -A
-kubectl describe challenge -A
-kubectl logs -n cert-manager deployment/cert-manager
+kubectl get alertmanager -n monitoring -o yaml
+kubectl get secret -n monitoring alertmanager-monitoring-kube-prometheus-alertmanager-generated -o yaml
 ```
 
-Также убедиться, что DNS A-запись домена указывает на внешний IP `ingress-nginx-controller`.
+---
 
-### Образ не обновился
+## Безопасность
 
-Проверить итоговый image в deployment:
+- Не коммитьте `terraform.tfvars`.
+- Не коммитьте `.env.secret`.
+- Не коммитьте Yandex Cloud JSON key.
+- Не храните Telegram bot token и chat id в README или Kubernetes manifests.
+- После копирования чувствительных outputs удаляйте временные файлы.
+- Для `main` и `staging` используйте branch protection и Pull Request workflow.
 
-```bash
-kubectl get deployment web -n smartmeeting-staging -o jsonpath='{.spec.template.spec.containers[0].image}'
-```
+---
 
-В манифестах базовый image должен быть:
-
-```yaml
-image: smartmeeting-app
-```
-
-А workflow должен выполнять:
-
-```bash
-kustomize edit set image smartmeeting-app="$IMAGE_NAME:$IMAGE_TAG"
-```
-
-### Не применились домены в overlay
-
-Проверить, что в GitHub Secrets заданы:
+## Краткий порядок полного запуска
 
 ```text
-PROD_APP_DOMAIN
-STAGING_APP_DOMAIN
-```
-
-И что перед `kubectl apply -k` выполняется `envsubst` для файлов:
-
-```text
-ingress-patch.yaml
-configmap-patch.yaml
+1. tms-graduation-project-infra-backend → terraform apply
+2. Получить ACCESS_KEY / SECRET_KEY backend
+3. tms-graduation-project-infra → terraform init -backend-config=...
+4. tms-graduation-project-infra → terraform apply
+5. Перенести Terraform outputs в GitHub Secrets приложения
+6. Настроить Kubernetes доступ и DNS
+7. Создать monitoring namespace и Telegram secret
+8. Выполнить первичный deploy staging
+9. Создать superuser в staging
+10. Создать PR staging → main
+11. После production deploy создать superuser в production
 ```
