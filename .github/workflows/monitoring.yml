@@ -27,7 +27,7 @@ jobs:
       - name: Get Kubernetes credentials
         run: |
           yc managed-kubernetes cluster get-credentials \
-            ${{ secrets.YC_K8S_CLUSTER_NAME }} \
+            ${{ secrets.YC_K8S_CLUSTER_ID }} \
             --folder-id ${{ secrets.YC_FOLDER_ID }} \
             --external
 
