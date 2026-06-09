@@ -127,6 +127,7 @@ jobs:
             YC_STORAGE_BUCKET_NAME="${{ secrets.YC_STORAGE_BUCKET_NAME }}"
             YC_STORAGE_ACCESS_KEY="${{ secrets.YC_STORAGE_ACCESS_KEY }}"
             YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
+            USE_S3_STATIC="${{ secrets.USE_S3_STATIC }}"
           else
             DB_USER="${{ secrets.STAGING_DB_USER }}"
             DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
@@ -136,9 +137,11 @@ jobs:
             YC_STORAGE_BUCKET_NAME="${{ secrets.YC_STORAGE_BUCKET_NAME }}"
             YC_STORAGE_ACCESS_KEY="${{ secrets.YC_STORAGE_ACCESS_KEY }}"
             YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
+            USE_S3_STATIC="${{ secrets.USE_S3_STATIC }}"
             if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "feature" ]]; then
               SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
               DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
+              USE_S3_STATIC="${{ secrets.USE_S3_STATIC }}"
             else
               DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
             fi
@@ -154,6 +157,7 @@ jobs:
           YC_STORAGE_BUCKET_NAME=${YC_STORAGE_BUCKET_NAME}
           YC_STORAGE_ACCESS_KEY=${YC_STORAGE_ACCESS_KEY}
           YC_STORAGE_SECRET_KEY=${YC_STORAGE_SECRET_KEY}
+          USE_S3_STATIC=${USE_S3_STATIC}
           EOF
 
       - name: Prepare kustomize overlay
