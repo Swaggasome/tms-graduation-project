@@ -52,6 +52,15 @@ SmartMeeting предназначен для бронирования перег
 | `tms-graduation-project-infra-backend` | Bootstrap Terraform backend: S3-compatible bucket в Yandex Object Storage для хранения Terraform state |
 | `tms-graduation-project-infra` | Основная инфраструктура Yandex Cloud: Managed Kubernetes, node group, VPC, Container Registry, Object Storage, service accounts, IAM-роли |
 
+### Repository Dependency Diagram
+
+```mermaid
+flowchart LR
+    A[tms-graduation-project-infra-backend] -->|создаёт S3 backend для Terraform state| B[tms-graduation-project-infra]
+    B -->|создаёт Kubernetes, Registry, Storage, IAM| C[tms-graduation-project]
+    C -->|GitHub Actions деплоит приложение| D[Yandex Cloud Managed Kubernetes]
+```
+
 Порядок работы:
 
 ```text
@@ -176,6 +185,45 @@ tms-graduation-project-infra/
 ---
 
 ## Архитектура
+
+### Infrastructure Diagram
+
+```mermaid
+flowchart TB
+    Developer[Developer]
+    GitHub[GitHub Repository]
+    Actions[GitHub Actions CI/CD]
+    Registry[Yandex Container Registry]
+    K8S[Yandex Cloud Managed Kubernetes]
+    Ingress[ingress-nginx + cert-manager]
+    Web[Django Web]
+    Worker[Celery Worker]
+    Beat[Celery Beat]
+    Postgres[(PostgreSQL)]
+    Redis[(Redis)]
+    Storage[Yandex Object Storage]
+    Monitoring[kube-prometheus-stack]
+
+    Developer -->|push / pull request| GitHub
+    GitHub --> Actions
+    Actions -->|docker build / push| Registry
+    Actions -->|kubectl apply -k| K8S
+    Registry -->|image pull| K8S
+    K8S --> Ingress
+    Ingress --> Web
+    K8S --> Web
+    K8S --> Worker
+    K8S --> Beat
+    Web --> Postgres
+    Web --> Redis
+    Worker --> Redis
+    Worker --> Postgres
+    Beat --> Redis
+    Web --> Storage
+    K8S --> Monitoring
+```
+
+### Runtime Components
 
 ```mermaid
 flowchart TB
