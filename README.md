@@ -19,6 +19,7 @@
 
 - [Назначение проекта](#назначение-проекта)
 - [Репозитории проекта](#репозитории-проекта)
+- [Repository Structure](#repository-structure)
 - [Стек](#стек)
 - [Архитектура](#архитектура)
 - [Git flow и правила веток](#git-flow-и-правила-веток)
@@ -51,6 +52,15 @@ SmartMeeting предназначен для бронирования перег
 | `tms-graduation-project-infra-backend` | Bootstrap Terraform backend: S3-compatible bucket в Yandex Object Storage для хранения Terraform state |
 | `tms-graduation-project-infra` | Основная инфраструктура Yandex Cloud: Managed Kubernetes, node group, VPC, Container Registry, Object Storage, service accounts, IAM-роли |
 
+### Repository Dependency Diagram
+
+```mermaid
+flowchart LR
+    A[tms-graduation-project-infra-backend] -->|создаёт S3 backend для Terraform state| B[tms-graduation-project-infra]
+    B -->|создаёт Kubernetes, Registry, Storage, IAM| C[tms-graduation-project]
+    C -->|GitHub Actions деплоит приложение| D[Yandex Cloud Managed Kubernetes]
+```
+
 Порядок работы:
 
 ```text
@@ -63,6 +73,82 @@ SmartMeeting предназначен для бронирования перег
 3. tms-graduation-project
    └─ собирает и деплоит приложение в Kubernetes
 ```
+
+---
+
+## Repository Structure
+
+Проект разделён на три самостоятельных репозитория: приложение, bootstrap backend для Terraform state и основная инфраструктура.
+
+### `tms-graduation-project`
+
+```text
+tms-graduation-project/
+├── .github/
+│   └── workflows/
+│       └── deploy.yaml              # CI/CD: build, push image, deploy to Kubernetes
+├── k8s/
+│   ├── base/                        # Общие Kubernetes manifests
+│   │   ├── configmap.yaml           # Общие переменные окружения приложения
+│   │   ├── celery-beat.yaml         # Deployment Celery Beat
+│   │   ├── celery-worker.yaml       # Deployment Celery Worker
+│   │   ├── ingress.yaml             # Базовый Ingress
+│   │   ├── kustomization.yaml       # Базовая Kustomize-конфигурация
+│   │   ├── namespace.yaml           # Базовый namespace manifest
+│   │   ├── postgres.yaml            # PostgreSQL manifests
+│   │   ├── redis.yaml               # Redis manifests
+│   │   └── web.yaml                 # Django web Deployment/Service
+│   ├── cluster/                     # Cluster-level ресурсы
+│   │   ├── cluster-issuers.yaml     # cert-manager ClusterIssuer
+│   │   └── kustomization.yaml
+│   └── overlays/
+│       ├── production/              # Production overlay: smartmeeting-prod
+│       ├── staging/                 # Staging overlay: smartmeeting-staging
+│       └── feature/                 # Feature overlay для временных окружений
+├── smartmeeting/                    # Django project settings / Celery / URLs / WSGI-ASGI
+├── meetings/                        # Django app бизнес-логики бронирования
+├── templates/                       # HTML templates
+├── static/                          # Static assets приложения
+├── Dockerfile                       # Docker image приложения
+├── docker-compose.yml               # Локальная разработка: web, postgres, redis, celery, beat
+├── manage.py                        # Django management entrypoint
+├── requirements.txt                 # Python dependencies
+└── README.md                        # Общая документация проекта
+```
+
+### `tms-graduation-project-infra-backend`
+
+```text
+tms-graduation-project-infra-backend/
+├── main.tf                          # Object Storage bucket, service account, IAM, static keys
+├── provider.tf                      # Yandex Cloud provider
+├── variables.tf                     # Входные переменные Terraform
+├── outputs.tf                       # access_key / secret_key для remote backend
+├── terraform.tfvars                 # Локальные значения переменных, не коммитить
+└── README.md                        # Документация bootstrap backend
+```
+
+Назначение репозитория — один раз создать S3-compatible backend в Yandex Object Storage для хранения Terraform state основного инфраструктурного репозитория.
+
+### `tms-graduation-project-infra`
+
+```text
+tms-graduation-project-infra/
+├── backend.tf                       # Remote S3-compatible backend для Terraform state
+├── provider.tf                      # Yandex Cloud provider
+├── variables.tf                     # Входные переменные инфраструктуры
+├── outputs.tf                       # Outputs для GitHub Actions и приложения
+├── network.tf                       # VPC network / subnet
+├── iam.tf                           # Service accounts и IAM-роли
+├── registry.tf                      # Yandex Container Registry
+├── storage.tf                       # Object Storage bucket для static files
+├── k8s.tf                           # Managed Kubernetes cluster
+├── node-group.tf                    # Kubernetes node group
+├── terraform.tfvars                 # Локальные значения переменных, не коммитить
+└── README.md                        # Документация основной инфраструктуры
+```
+
+> Имена отдельных Terraform-файлов могут отличаться от примера, но логическое разделение должно сохраняться: provider/backend, IAM, network, registry, storage, Kubernetes cluster, node group, variables и outputs.
 
 ---
 
@@ -99,6 +185,45 @@ SmartMeeting предназначен для бронирования перег
 ---
 
 ## Архитектура
+
+### Infrastructure Diagram
+
+```mermaid
+flowchart TB
+    Developer[Developer]
+    GitHub[GitHub Repository]
+    Actions[GitHub Actions CI/CD]
+    Registry[Yandex Container Registry]
+    K8S[Yandex Cloud Managed Kubernetes]
+    Ingress[ingress-nginx + cert-manager]
+    Web[Django Web]
+    Worker[Celery Worker]
+    Beat[Celery Beat]
+    Postgres[(PostgreSQL)]
+    Redis[(Redis)]
+    Storage[Yandex Object Storage]
+    Monitoring[kube-prometheus-stack]
+
+    Developer -->|push / pull request| GitHub
+    GitHub --> Actions
+    Actions -->|docker build / push| Registry
+    Actions -->|kubectl apply -k| K8S
+    Registry -->|image pull| K8S
+    K8S --> Ingress
+    Ingress --> Web
+    K8S --> Web
+    K8S --> Worker
+    K8S --> Beat
+    Web --> Postgres
+    Web --> Redis
+    Worker --> Redis
+    Worker --> Postgres
+    Beat --> Redis
+    Web --> Storage
+    K8S --> Monitoring
+```
+
+### Runtime Components
 
 ```mermaid
 flowchart TB
