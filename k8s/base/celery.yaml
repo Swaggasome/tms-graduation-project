@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: celery-worker
 spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
   replicas: 1
   selector:
     matchLabels:
@@ -35,6 +38,9 @@ kind: Deployment
 metadata:
   name: celery-beat
 spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
   replicas: 1
   selector:
     matchLabels:

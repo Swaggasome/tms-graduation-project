@@ -199,17 +199,66 @@ jobs:
         run: |
           kubectl apply --dry-run=client -k "$OVERLAY_PATH"
 
-      - name: Deploy
-        run: |
-          kubectl apply -k "$OVERLAY_PATH"
-
-      - name: Wait for deployments
+      - name: Deploy and rollback on failure
         env:
           NAMESPACE: ${{ steps.env.outputs.NAMESPACE }}
+        shell: bash
         run: |
-          kubectl rollout status deployment/web -n "$NAMESPACE" --timeout=300s
-          kubectl rollout status deployment/celery-worker -n "$NAMESPACE" --timeout=300s
-          kubectl rollout status deployment/celery-beat -n "$NAMESPACE" --timeout=300s
+          set -e
+
+          DEPLOYMENTS=("web" "celery-worker" "celery-beat")
+
+          echo "Applying manifests..."
+          kubectl apply -k "$OVERLAY_PATH"
+
+          echo "Annotating deployments..."
+          for deploy in "${DEPLOYMENTS[@]}"; do
+            kubectl annotate deployment/"$deploy" \
+              kubernetes.io/change-cause="Deploy image $IMAGE_NAME:$IMAGE_TAG from commit $GITHUB_SHA" \
+              -n "$NAMESPACE" --overwrite || true
+          done
+
+          failed=0
+
+          for deploy in "${DEPLOYMENTS[@]}"; do
+            echo "Waiting for deployment/$deploy..."
+
+            if ! kubectl rollout status deployment/"$deploy" -n "$NAMESPACE" --timeout=300s; then
+              echo "Deployment failed: $deploy"
+              failed=1
+            fi
+          done
+
+          if [[ "$failed" -eq 1 ]]; then
+            echo "Deployment failed. Starting rollback..."
+
+            for deploy in "${DEPLOYMENTS[@]}"; do
+              echo "Rolling back deployment/$deploy..."
+              kubectl rollout undo deployment/"$deploy" -n "$NAMESPACE" || true
+            done
+
+            echo "Waiting for rollback..."
+
+            for deploy in "${DEPLOYMENTS[@]}"; do
+              kubectl rollout status deployment/"$deploy" -n "$NAMESPACE" --timeout=300s || true
+            done
+
+            echo "Pods after rollback:"
+            kubectl get pods -n "$NAMESPACE" -o wide
+
+            echo "Deployment history:"
+            for deploy in "${DEPLOYMENTS[@]}"; do
+              echo "History for deployment/$deploy:"
+              kubectl rollout history deployment/"$deploy" -n "$NAMESPACE" || true
+            done
+
+            echo "Recent events:"
+            kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp | tail -n 50
+
+            exit 1
+          fi
+
+          echo "Deployment completed successfully"
 
       - name: Cleanup
         if: always()
