@@ -428,7 +428,7 @@ terraform output -raw yc_sa_json_credentials_raw > key.json &&  \
 xclip -selection clipboard < key.json && \
 rm key.json
 ```
-
+Тоже самое надо сделать по остальным outputs при этом заполняя секреты в GitHub
 ---
 
 ## GitHub Secrets
@@ -501,18 +501,19 @@ yc managed-kubernetes cluster get-credentials \
 kubectl get nodes
 ```
 
+Установить `cert-manager` и `ingress-nginx` вручную:
+
+```bash
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.5/cert-manager.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
+```
+
 Установить cluster-level ресурсы приложения:
 
 ```bash
 kubectl apply -k k8s/cluster/.
 ```
 
-При необходимости установить `cert-manager` и `ingress-nginx` вручную:
-
-```bash
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.19.5/cert-manager.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.1/deploy/static/provider/cloud/deploy.yaml
-```
 
 Получить внешний IP LoadBalancer:
 
@@ -538,6 +539,7 @@ kubectl create secret generic telegram-alerts \
   --from-literal=bot-token='<TELEGRAM_BOT_TOKEN>' \
   --from-literal=chat-id='<TELEGRAM_CHAT_ID>'
 ```
+Зайти в Actions на GitHub и запустить Action - Install Monitoring вручную
 
 Первичный deploy staging. Это единственный допустимый случай прямого push в `staging`:
 
