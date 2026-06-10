@@ -421,12 +421,12 @@ terraform apply
 | `static_files_secret_key` | `YC_STORAGE_SECRET_KEY` |
 | `k8s_id` | `YC_K8S_CLUSTER_ID` |
 
-Пример копирования JSON-ключа:
+Пример копирования в буфер JSON-ключа:
 
 ```bash
-terraform output -raw yc_sa_json_credentials_raw > key.json
-# скопировать содержимое key.json в GitHub Secret YC_SA_JSON_CREDENTIALS
-rm -f key.json
+terraform output -raw yc_sa_json_credentials_raw > key.json &&  \
+xclip -selection clipboard < key.json && \
+rm key.json
 ```
 
 ---
