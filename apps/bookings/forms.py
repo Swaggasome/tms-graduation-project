@@ -85,6 +85,12 @@ class BookingForm(forms.ModelForm):
         start_time = cleaned_data.get('start_time')
         end_time = cleaned_data.get('end_time')
         room = cleaned_data.get('room')
+        attendees_count = cleaned_data.get('attendees_count')
+
+        if room and attendees_count and attendees_count > room.capacity:
+            raise forms.ValidationError(
+                f'Количество участников ({attendees_count}) превышает вместимость переговорной "{room.name}" ({room.capacity} чел.).'
+            )
 
         if date and start_time and end_time:
             from django.utils.timezone import make_aware
