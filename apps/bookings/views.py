@@ -1,17 +1,32 @@
-# apps/bookings/views.py (полностью обновленная версия)
+# apps/bookings/views.py
 
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+from datetime import datetime, timedelta
+
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import redirect, render
 from django.utils import timezone
-from django.http import JsonResponse
-from datetime import datetime
-from .models import Booking
+
 from .forms import BookingForm
-from .services import BookingService
-from apps.rooms.models import Room
+from .models import Booking
+from .utils import build_bookings_ics
 from apps.notifications.tasks import send_booking_reminder
-from datetime import timedelta
+from apps.rooms.models import Room
+
+
+STATUS_COLORS = {
+    'confirmed': '#198754',
+    'pending': '#ffc107',
+    'cancelled': '#dc3545',
+    'completed': '#6c757d',
+    'rejected': '#dc3545',
+}
+
+
+@login_required
+def _user_bookings_queryset(request):
+    return Booking.objects.filter(user=request.user).select_related('room').order_by('start_time')
 
 
 def home_view(request):
@@ -37,7 +52,7 @@ def home_view(request):
 @login_required
 def calendar_view(request):
     """Календарь бронирований"""
-    rooms = Room.objects.filter(is_active=True)
+    rooms = Room.objects.filter(is_active=True).order_by('floor', 'name')
     my_bookings = Booking.objects.filter(
         user=request.user,
         start_time__gte=timezone.now(),
@@ -47,6 +62,7 @@ def calendar_view(request):
     context = {
         'rooms': rooms,
         'my_bookings': my_bookings,
+        'statuses': Booking.STATUS_CHOICES,
     }
     return render(request, 'bookings/calendar.html', context)
 
@@ -54,29 +70,22 @@ def calendar_view(request):
 @login_required
 def create_booking(request):
     """Создание нового бронирования"""
-    from django.utils.timezone import make_aware
-    from datetime import datetime, timedelta
-
-    # Обработка GET параметров для предзаполнения
     start_param = request.GET.get('start')
     initial_data = {}
 
     if start_param:
         try:
-            # Парсим дату из запроса
             if 'T' in start_param:
                 start_datetime = datetime.fromisoformat(start_param.replace('Z', '+00:00'))
-                # Преобразуем в локальное время без часового пояса для формы
                 start_datetime = start_datetime.replace(tzinfo=None)
                 initial_data['start_time'] = start_datetime
-        except:
+        except ValueError:
             pass
 
     if request.method == 'POST':
         form = BookingForm(request.POST)
         if form.is_valid():
             try:
-                # Получаем объединенные дату и время из cleaned_data
                 start_datetime = form.cleaned_data.get('start_datetime')
                 end_datetime = form.cleaned_data.get('end_datetime')
 
@@ -85,7 +94,6 @@ def create_booking(request):
                     return render(request, 'bookings/booking_form.html',
                                   {'form': form, 'title': 'Создание бронирования'})
 
-                # Создаем бронирование
                 booking = Booking(
                     user=request.user,
                     room=form.cleaned_data['room'],
@@ -96,12 +104,14 @@ def create_booking(request):
                     attendees_count=form.cleaned_data['attendees_count'],
                     needs_projector=form.cleaned_data['needs_projector'],
                     needs_video_conf=form.cleaned_data['needs_video_conf'],
-                    status='confirmed'  # Сразу подтверждаем
+                    status='confirmed'
                 )
 
                 booking.save()
-                messages.success(request,
-                                 f'✅ Переговорная "{booking.room.name}" успешно забронирована на {start_datetime.strftime("%d.%m.%Y %H:%M")}!')
+                messages.success(
+                    request,
+                    f'✅ Переговорная "{booking.room.name}" успешно забронирована на {start_datetime.strftime("%d.%m.%Y %H:%M")}!'
+                )
                 reminder_time = start_datetime - timedelta(hours=1)
                 if reminder_time > timezone.now():
                     send_booking_reminder.apply_async(
@@ -113,7 +123,6 @@ def create_booking(request):
             except Exception as e:
                 messages.error(request, f'❌ Ошибка при создании бронирования: {str(e)}')
         else:
-            # Выводим все ошибки формы
             for field, errors in form.errors.items():
                 for error in errors:
                     messages.error(request, f'❌ {field}: {error}')
@@ -131,25 +140,57 @@ def get_events_api(request):
     """API для получения событий календаря"""
     start = request.GET.get('start')
     end = request.GET.get('end')
+    room_id = request.GET.get('room')
+    status = request.GET.get('status')
 
-    bookings = Booking.objects.filter(
-        user=request.user,
-        start_time__gte=start,
-        end_time__lte=end,
-        status__in=['confirmed', 'pending']
-    ).select_related('room')
+    bookings = _user_bookings_queryset(request)
+
+    if start:
+        bookings = bookings.filter(start_time__gte=start)
+    if end:
+        bookings = bookings.filter(end_time__lte=end)
+    if room_id:
+        bookings = bookings.filter(room_id=room_id)
+    if status:
+        bookings = bookings.filter(status=status)
+    else:
+        bookings = bookings.filter(status__in=['confirmed', 'pending'])
 
     events = []
     for booking in bookings:
+        room = booking.room
         events.append({
             'id': booking.id,
-            'title': f"{booking.title} - {booking.room.name}",
+            'title': f'{booking.title} — {room.name}',
             'start': booking.start_time.isoformat(),
             'end': booking.end_time.isoformat(),
-            'room': booking.room.name,
-            'status': booking.status,
-            'color': '#28a745' if booking.status == 'confirmed' else '#ffc107',
-            'textColor': '#000000'
+            'color': STATUS_COLORS.get(booking.status, '#0d6efd'),
+            'textColor': '#ffffff' if booking.status != 'pending' else '#000000',
+            'extendedProps': {
+                'description': booking.description,
+                'room': room.name,
+                'floor': room.floor,
+                'capacity': room.capacity,
+                'attendees_count': booking.attendees_count,
+                'status': booking.status,
+                'status_display': booking.get_status_display(),
+                'needs_projector': booking.needs_projector,
+                'needs_video_conf': booking.needs_video_conf,
+            }
         })
 
     return JsonResponse(events, safe=False)
+
+
+@login_required
+def export_calendar_ics(request):
+    """Экспорт пользовательских бронирований в iCalendar (.ics)."""
+    bookings = _user_bookings_queryset(request).filter(status__in=['confirmed', 'pending'])
+    ics_content = build_bookings_ics(
+        bookings,
+        calendar_name=f'SmartMeeting — {request.user.get_full_name() or request.user.username}'
+    )
+
+    response = HttpResponse(ics_content, content_type='text/calendar; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="smartmeeting-calendar.ics"'
+    return response
