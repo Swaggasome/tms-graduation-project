@@ -4,12 +4,12 @@ from datetime import datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from .forms import BookingForm
-from .models import Booking
+from .models import Booking, CalendarFeedToken
 from .utils import build_bookings_ics
 from apps.notifications.tasks import send_booking_reminder
 from apps.rooms.models import Room
@@ -27,6 +27,13 @@ STATUS_COLORS = {
 @login_required
 def _user_bookings_queryset(request):
     return Booking.objects.filter(user=request.user).select_related('room').order_by('start_time')
+
+
+def _ics_response(ics_content, filename='smartmeeting-calendar.ics'):
+    response = HttpResponse(ics_content, content_type='text/calendar; charset=utf-8')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
 
 
 def home_view(request):
@@ -58,11 +65,15 @@ def calendar_view(request):
         start_time__gte=timezone.now(),
         status__in=['confirmed', 'pending']
     ).select_related('room').order_by('start_time')[:10]
+    feed_token = CalendarFeedToken.get_or_create_for_user(request.user)
 
     context = {
         'rooms': rooms,
         'my_bookings': my_bookings,
         'statuses': Booking.STATUS_CHOICES,
+        'calendar_feed_url': request.build_absolute_uri(
+            f'/calendar/feed/{feed_token.token}.ics'
+        ),
     }
     return render(request, 'bookings/calendar.html', context)
 
@@ -190,7 +201,23 @@ def export_calendar_ics(request):
         bookings,
         calendar_name=f'SmartMeeting — {request.user.get_full_name() or request.user.username}'
     )
+    return _ics_response(ics_content)
 
-    response = HttpResponse(ics_content, content_type='text/calendar; charset=utf-8')
-    response['Content-Disposition'] = 'attachment; filename="smartmeeting-calendar.ics"'
-    return response
+
+def calendar_feed(request, token):
+    """Публичная read-only подписка на календарь по приватному токену."""
+    try:
+        feed_token = CalendarFeedToken.objects.select_related('user').get(token=token)
+    except CalendarFeedToken.DoesNotExist:
+        raise Http404('Calendar feed not found')
+
+    bookings = Booking.objects.filter(
+        user=feed_token.user,
+        status__in=['confirmed', 'pending']
+    ).select_related('room').order_by('start_time')
+
+    ics_content = build_bookings_ics(
+        bookings,
+        calendar_name=f'SmartMeeting — {feed_token.user.get_full_name() or feed_token.user.username}'
+    )
+    return _ics_response(ics_content, filename='smartmeeting-feed.ics')
