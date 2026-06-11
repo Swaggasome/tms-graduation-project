@@ -1,4 +1,6 @@
 # apps/bookings/models.py
+import secrets
+
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -46,9 +48,8 @@ class Booking(models.Model):
 
     def clean(self):
         """Валидация на уровне модели"""
-        # Проверяем, что поля не None
         if self.start_time is None or self.end_time is None:
-            return  # Если поля не заполнены, не выполняем валидацию
+            return
 
         if self.start_time >= self.end_time:
             raise ValidationError('Время начала должно быть раньше времени окончания')
@@ -56,17 +57,50 @@ class Booking(models.Model):
         if self.start_time < timezone.now():
             raise ValidationError('Нельзя бронировать прошедшее время')
 
-        # Максимум 4 часа
         duration = (self.end_time - self.start_time).total_seconds() / 3600
         if duration > 4:
             raise ValidationError('Максимальная длительность бронирования - 4 часа')
 
-        # Минимум 15 минут
         if duration < 0.25:
             raise ValidationError('Минимальная длительность бронирования - 15 минут')
 
     def save(self, *args, **kwargs):
-        # Вызываем clean только если поля заполнены
         if self.start_time and self.end_time:
             self.full_clean()
         super().save(*args, **kwargs)
+
+
+class CalendarFeedToken(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='calendar_feed_token',
+        verbose_name='Пользователь'
+    )
+    token = models.CharField('Токен', max_length=64, unique=True, db_index=True)
+    created_at = models.DateTimeField('Создан', auto_now_add=True)
+    updated_at = models.DateTimeField('Обновлён', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Токен подписки на календарь'
+        verbose_name_plural = 'Токены подписки на календарь'
+
+    def __str__(self):
+        return f'Calendar feed token for {self.user}'
+
+    @staticmethod
+    def generate_token():
+        return secrets.token_urlsafe(32)
+
+    @classmethod
+    def get_or_create_for_user(cls, user):
+        token_obj, _ = cls.objects.get_or_create(
+            user=user,
+            defaults={'token': cls.generate_token()}
+        )
+        return token_obj
+
+    def rotate(self):
+        self.token = self.generate_token()
+        self.save(update_fields=['token', 'updated_at'])
+        return self.token
