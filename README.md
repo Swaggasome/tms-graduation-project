@@ -1,5 +1,6 @@
 # SmartMeeting
 
+
 <p align="center">
   <b>SmartMeeting</b> — web-система бронирования переговорных комнат с промышленным CI/CD, Kubernetes-деплоем и инфраструктурой в Yandex Cloud.
 </p>
