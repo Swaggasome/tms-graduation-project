@@ -9,7 +9,7 @@ data:
   DJANGO_SETTINGS_MODULE: "smartmeeting.settings"
   PYTHONUNBUFFERED: "1"
   DJANGO_DEBUG: "False"
-  EMAIL_BACKEND: "django.core.mail.backends.console.EmailBackend"
+  # EMAIL_BACKEND: "django.core.mail.backends.console.EmailBackend"
   DJANGO_CSRF_COOKIE_SECURE: "True"
   DJANGO_SESSION_COOKIE_SECURE: "True"
   DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
