@@ -50,6 +50,29 @@
                     <div class="d-grid gap-2">
                         <a href="{% url 'create_booking' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Создать бронирование</a>
                         <a href="{% url 'export_calendar' %}" class="btn btn-outline-success"><i class="fas fa-file-export"></i> Экспорт .ICS</a>
+                        <hr>
+
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    URL подписки на календарь
+                                </label>
+
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    readonly
+                                    value="{{ calendar_feed_url }}"
+                                    id="calendar-feed-url"
+                                >
+
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary mt-2 w-100"
+                                    onclick="navigator.clipboard.writeText(document.getElementById('calendar-feed-url').value)"
+                                >
+                                    Скопировать ссылку
+                                </button>
+                            </div>
                     </div>
                     <hr>
                     <div class="mb-3">
