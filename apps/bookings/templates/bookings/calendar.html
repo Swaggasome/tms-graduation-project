@@ -3,67 +3,302 @@
 
 {% block title %}Календарь бронирований{% endblock %}
 
+{% block extra_css %}
+<style>
+    .calendar-page {
+        padding: 24px 0;
+    }
+
+    .calendar-toolbar-card,
+    .booking-list-card,
+    .calendar-card {
+        border: 0;
+        border-radius: 18px;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+    }
+
+    .booking-list-card {
+        position: sticky;
+        top: 20px;
+    }
+
+    .booking-list-item {
+        border: 1px solid #edf2f7;
+        border-radius: 14px;
+        margin-bottom: 10px;
+        padding: 12px;
+        background: #fff;
+    }
+
+    .booking-list-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .booking-title {
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    .booking-meta {
+        color: #6b7280;
+        font-size: .875rem;
+    }
+
+    .calendar-card .card-body {
+        padding: 18px;
+    }
+
+    #calendar {
+        min-height: 720px;
+    }
+
+    .fc .fc-toolbar-title {
+        font-size: 1.35rem;
+        font-weight: 700;
+    }
+
+    .fc .fc-button {
+        border-radius: 10px;
+    }
+
+    .fc-event {
+        border: 0;
+        border-radius: 10px;
+        padding: 2px 4px;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="row">
-    <div class="col-md-3">
-        <div class="card">
-            <div class="card-header">
-                <h5>📋 Мои бронирования</h5>
+<div class="container-fluid calendar-page">
+    <div class="row g-4">
+        <div class="col-lg-3">
+            <div class="card calendar-toolbar-card mb-4">
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'create_booking' %}" class="btn btn-primary">
+                            <i class="fas fa-plus"></i> Создать бронирование
+                        </a>
+                        <a href="{% url 'export_calendar' %}" class="btn btn-outline-success">
+                            <i class="fas fa-file-export"></i> Экспорт .ICS
+                        </a>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-3">
+                        <label for="room-filter" class="form-label">Переговорная</label>
+                        <select id="room-filter" class="form-select">
+                            <option value="">Все переговорные</option>
+                            {% for room in rooms %}
+                                <option value="{{ room.id }}">{{ room.name }} — {{ room.floor }} этаж</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="status-filter" class="form-label">Статус</label>
+                        <select id="status-filter" class="form-select">
+                            <option value="">Активные</option>
+                            {% for value, label in statuses %}
+                                <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <button id="reset-filters" class="btn btn-light w-100">
+                        <i class="fas fa-rotate-left"></i> Сбросить фильтры
+                    </button>
+                </div>
             </div>
-            <div class="card-body" id="my-bookings-list">
-                <div class="list-group">
+
+            <div class="card booking-list-card">
+                <div class="card-header bg-white border-0 pt-4 px-4">
+                    <h5 class="mb-0">📋 Ближайшие бронирования</h5>
+                </div>
+                <div class="card-body px-4 pb-4" id="my-bookings-list">
                     {% for booking in my_bookings %}
-                        <div class="list-group-item">
-                            <strong>{{ booking.title }}</strong><br>
-                            <small>{{ booking.room.name }}</small><br>
-                            <small>{{ booking.start_time|date:"d.m H:i" }} - {{ booking.end_time|date:"H:i" }}</small>
-                            <span class="badge bg-{% if booking.status == 'confirmed' %}success{% else %}warning{% endif %}">
+                        <div class="booking-list-item">
+                            <div class="booking-title">{{ booking.title }}</div>
+                            <div class="booking-meta">
+                                <i class="fas fa-door-open"></i> {{ booking.room.name }}<br>
+                                <i class="fas fa-clock"></i>
+                                {{ booking.start_time|date:"d.m.Y H:i" }} — {{ booking.end_time|date:"H:i" }}
+                            </div>
+                            <span class="badge bg-{% if booking.status == 'confirmed' %}success{% elif booking.status == 'pending' %}warning text-dark{% else %}secondary{% endif %} mt-2">
                                 {{ booking.get_status_display }}
                             </span>
                         </div>
                     {% empty %}
-                        <p class="text-muted">Нет активных бронирований</p>
+                        <p class="text-muted mb-0">Нет активных бронирований</p>
                     {% endfor %}
                 </div>
             </div>
         </div>
-        <a href="{% url 'create_booking' %}" class="btn btn-primary w-100 mt-3">+ Создать бронирование</a>
-    </div>
 
-    <div class="col-md-9">
-        <div class="card">
-            <div class="card-body">
-                <div id="calendar"></div>
+        <div class="col-lg-9">
+            <div class="card calendar-card">
+                <div class="card-body">
+                    <div id="calendar"></div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+<div class="modal fade" id="bookingDetailsModal" tabindex="-1" aria-labelledby="bookingDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bookingDetailsModalLabel">Детали бронирования</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <h5 id="modal-booking-title" class="mb-3"></h5>
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Переговорная</dt>
+                    <dd class="col-sm-8" id="modal-room"></dd>
+
+                    <dt class="col-sm-4">Время</dt>
+                    <dd class="col-sm-8" id="modal-time"></dd>
+
+                    <dt class="col-sm-4">Статус</dt>
+                    <dd class="col-sm-8" id="modal-status"></dd>
+
+                    <dt class="col-sm-4">Участники</dt>
+                    <dd class="col-sm-8" id="modal-attendees"></dd>
+
+                    <dt class="col-sm-4">Оборудование</dt>
+                    <dd class="col-sm-8" id="modal-equipment"></dd>
+
+                    <dt class="col-sm-4">Описание</dt>
+                    <dd class="col-sm-8" id="modal-description"></dd>
+                </dl>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    var calendarEl = document.getElementById('calendar');
-    var calendar = new FullCalendar.Calendar(calendarEl, {
+    const calendarEl = document.getElementById('calendar');
+    const roomFilter = document.getElementById('room-filter');
+    const statusFilter = document.getElementById('status-filter');
+    const resetFilters = document.getElementById('reset-filters');
+    const bookingModal = new bootstrap.Modal(document.getElementById('bookingDetailsModal'));
+
+    const formatDateTime = function(date) {
+        return new Intl.DateTimeFormat('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        }).format(date);
+    };
+
+    const buildEventsUrl = function(info) {
+        const url = new URL('{% url "api_events" %}', window.location.origin);
+        url.searchParams.set('start', info.startStr);
+        url.searchParams.set('end', info.endStr);
+
+        if (roomFilter.value) {
+            url.searchParams.set('room', roomFilter.value);
+        }
+        if (statusFilter.value) {
+            url.searchParams.set('status', statusFilter.value);
+        }
+
+        return url.toString();
+    };
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'timeGridWeek',
         locale: 'ru',
+        firstDay: 1,
+        nowIndicator: true,
+        selectable: true,
+        height: 'auto',
+        slotMinTime: '08:00:00',
+        slotMaxTime: '22:00:00',
+        slotDuration: '00:30:00',
+        businessHours: {
+            daysOfWeek: [1, 2, 3, 4, 5],
+            startTime: '09:00',
+            endTime: '18:00'
+        },
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
         },
-        slotMinTime: '08:00:00',
-        slotMaxTime: '22:00:00',
-        events: '/api/events/',
-        selectable: true,
+        buttonText: {
+            today: 'Сегодня',
+            month: 'Месяц',
+            week: 'Неделя',
+            day: 'День',
+            list: 'Список'
+        },
+        events: function(info, successCallback, failureCallback) {
+            fetch(buildEventsUrl(info), {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Ошибка загрузки событий календаря');
+                    }
+                    return response.json();
+                })
+                .then(successCallback)
+                .catch(failureCallback);
+        },
         select: function(info) {
-            if (confirm('Забронировать на ' + info.startStr + '?')) {
-                window.location.href = '/bookings/create/?start=' + info.startStr;
-            }
+            const start = encodeURIComponent(info.startStr);
+            window.location.href = '{% url "create_booking" %}?start=' + start;
         },
         eventClick: function(info) {
-            alert('Бронирование: ' + info.event.title);
+            const event = info.event;
+            const props = event.extendedProps;
+            const equipment = [];
+
+            if (props.needs_projector) {
+                equipment.push('проектор');
+            }
+            if (props.needs_video_conf) {
+                equipment.push('видеоконференция');
+            }
+
+            document.getElementById('modal-booking-title').textContent = event.title;
+            document.getElementById('modal-room').textContent = `${props.room}, ${props.floor} этаж, вместимость ${props.capacity} чел.`;
+            document.getElementById('modal-time').textContent = `${formatDateTime(event.start)} — ${formatDateTime(event.end)}`;
+            document.getElementById('modal-status').innerHTML = `<span class="badge bg-primary">${props.status_display}</span>`;
+            document.getElementById('modal-attendees').textContent = `${props.attendees_count} чел.`;
+            document.getElementById('modal-equipment').textContent = equipment.length ? equipment.join(', ') : 'Не требуется';
+            document.getElementById('modal-description').textContent = props.description || 'Без описания';
+
+            bookingModal.show();
         }
     });
+
     calendar.render();
+
+    roomFilter.addEventListener('change', function() {
+        calendar.refetchEvents();
+    });
+
+    statusFilter.addEventListener('change', function() {
+        calendar.refetchEvents();
+    });
+
+    resetFilters.addEventListener('click', function() {
+        roomFilter.value = '';
+        statusFilter.value = '';
+        calendar.refetchEvents();
+    });
 });
 </script>
 {% endblock %}
