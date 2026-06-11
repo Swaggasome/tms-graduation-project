@@ -4,24 +4,17 @@
 {% block title %}Календарь бронирований{% endblock %}
 
 {% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.css" rel="stylesheet">
 <style>
     .calendar-page { padding: 24px 0; }
-
     .calendar-toolbar-card,
     .booking-list-card,
-    .calendar-card,
-    .booking-details-card {
+    .calendar-card {
         border: 0;
         border-radius: 18px;
         box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
     }
-
-    .booking-list-card,
-    .booking-details-card {
-        position: sticky;
-        top: 20px;
-    }
-
+    .booking-list-card { position: sticky; top: 20px; }
     .booking-list-item {
         border: 1px solid #edf2f7;
         border-radius: 14px;
@@ -29,22 +22,29 @@
         padding: 12px;
         background: #fff;
     }
-
     .booking-title { font-weight: 600; color: #1f2937; }
     .booking-meta { color: #6b7280; font-size: .875rem; }
     .calendar-card .card-body { padding: 18px; }
-    #calendar { min-height: 720px; }
+    #calendar { min-height: 620px; }
     .fc .fc-toolbar-title { font-size: 1.35rem; font-weight: 700; }
     .fc .fc-button { border-radius: 10px; }
     .fc-event { border: 0; border-radius: 10px; padding: 2px 4px; cursor: pointer; }
-    .details-placeholder { color: #6b7280; }
+    .event-details-panel {
+        display: none;
+        border: 1px solid #e5e7eb;
+        border-radius: 14px;
+        background: #f8fafc;
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+    .event-details-panel.is-visible { display: block; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid calendar-page">
     <div class="row g-4">
-        <div class="col-xl-3 col-lg-4">
+        <div class="col-lg-3">
             <div class="card calendar-toolbar-card mb-4">
                 <div class="card-body">
                     <div class="d-grid gap-2">
@@ -95,28 +95,24 @@
             </div>
         </div>
 
-        <div class="col-xl-6 col-lg-8">
+        <div class="col-lg-9">
             <div class="card calendar-card">
-                <div class="card-body"><div id="calendar"></div></div>
-            </div>
-        </div>
-
-        <div class="col-xl-3 col-lg-12">
-            <div class="card booking-details-card" id="details-card">
-                <div class="card-header bg-white border-0 pt-4 px-4"><h5 class="mb-0">ℹ️ Детали события</h5></div>
-                <div class="card-body px-4 pb-4">
-                    <div id="details-placeholder" class="details-placeholder">Выберите бронирование в календаре, чтобы увидеть подробности.</div>
-                    <div id="details-content" class="d-none">
-                        <h5 id="details-title" class="mb-3"></h5>
-                        <dl class="row mb-0">
-                            <dt class="col-sm-5">Переговорная</dt><dd class="col-sm-7" id="details-room"></dd>
-                            <dt class="col-sm-5">Время</dt><dd class="col-sm-7" id="details-time"></dd>
-                            <dt class="col-sm-5">Статус</dt><dd class="col-sm-7" id="details-status"></dd>
-                            <dt class="col-sm-5">Участники</dt><dd class="col-sm-7" id="details-attendees"></dd>
-                            <dt class="col-sm-5">Оборудование</dt><dd class="col-sm-7" id="details-equipment"></dd>
-                            <dt class="col-sm-5">Описание</dt><dd class="col-sm-7" id="details-description"></dd>
-                        </dl>
+                <div class="card-body">
+                    <div id="event-details" class="event-details-panel">
+                        <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                            <h5 id="details-title" class="mb-0"></h5>
+                            <button type="button" id="close-details" class="btn-close" aria-label="Закрыть"></button>
+                        </div>
+                        <div class="row g-3 small">
+                            <div class="col-md-4"><strong>Переговорная:</strong><br><span id="details-room"></span></div>
+                            <div class="col-md-4"><strong>Время:</strong><br><span id="details-time"></span></div>
+                            <div class="col-md-4"><strong>Статус:</strong><br><span id="details-status"></span></div>
+                            <div class="col-md-4"><strong>Участники:</strong><br><span id="details-attendees"></span></div>
+                            <div class="col-md-4"><strong>Оборудование:</strong><br><span id="details-equipment"></span></div>
+                            <div class="col-md-4"><strong>Описание:</strong><br><span id="details-description"></span></div>
+                        </div>
                     </div>
+                    <div id="calendar"></div>
                 </div>
             </div>
         </div>
@@ -125,13 +121,22 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/main.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.11.3/locales/ru.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const calendarEl = document.getElementById('calendar');
     const roomFilter = document.getElementById('room-filter');
     const statusFilter = document.getElementById('status-filter');
     const resetFilters = document.getElementById('reset-filters');
+    const detailsPanel = document.getElementById('event-details');
+    const closeDetails = document.getElementById('close-details');
     const apiEventsUrl = '{% url "api_events" %}';
+
+    if (typeof FullCalendar === 'undefined') {
+        calendarEl.innerHTML = '<div class="alert alert-danger">FullCalendar не загрузился. Проверьте доступ к CDN.</div>';
+        return;
+    }
 
     const formatDateTime = function(date) {
         return new Intl.DateTimeFormat('ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'}).format(date);
@@ -152,8 +157,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (props.needs_projector) equipment.push('проектор');
         if (props.needs_video_conf) equipment.push('видеоконференция');
 
-        document.getElementById('details-placeholder').classList.add('d-none');
-        document.getElementById('details-content').classList.remove('d-none');
+        detailsPanel.classList.add('is-visible');
         document.getElementById('details-title').textContent = event.title;
         document.getElementById('details-room').textContent = `${props.room}, ${props.floor} этаж, ${props.capacity} чел.`;
         document.getElementById('details-time').textContent = `${formatDateTime(event.start)} — ${formatDateTime(event.end)}`;
@@ -183,7 +187,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     return response.json();
                 })
                 .then(successCallback)
-                .catch(failureCallback);
+                .catch(error => {
+                    calendarEl.insertAdjacentHTML('afterbegin', '<div class="alert alert-danger">Не удалось загрузить события календаря.</div>');
+                    failureCallback(error);
+                });
         },
         select: function(info) {
             window.location.href = '{% url "create_booking" %}?start=' + encodeURIComponent(info.startStr);
@@ -200,7 +207,11 @@ document.addEventListener('DOMContentLoaded', function() {
     resetFilters.addEventListener('click', function() {
         roomFilter.value = '';
         statusFilter.value = '';
+        detailsPanel.classList.remove('is-visible');
         calendar.refetchEvents();
+    });
+    closeDetails.addEventListener('click', function() {
+        detailsPanel.classList.remove('is-visible');
     });
 });
 </script>
