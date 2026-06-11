@@ -467,6 +467,7 @@ Settings → Secrets and variables → Actions → New repository secret
 | `YC_STORAGE_SECRET_KEY` | Static secret key |
 | `EMAIL_HOST_USER` | Gmail-аккаунт для отправки уведомлений |
 | `EMAIL_HOST_PASSWORD` | Gmail app password |
+| `DEFAULT_FROM_EMAIL` | Email from |
 
 ### Production
 
