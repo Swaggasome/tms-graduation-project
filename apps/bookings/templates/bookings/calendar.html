@@ -50,29 +50,12 @@
                     <div class="d-grid gap-2">
                         <a href="{% url 'create_booking' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Создать бронирование</a>
                         <a href="{% url 'export_calendar' %}" class="btn btn-outline-success"><i class="fas fa-file-export"></i> Экспорт .ICS</a>
-                        <hr>
-
-                            <div class="mb-3">
-                                <label class="form-label">
-                                    URL подписки на календарь
-                                </label>
-
-                                <input
-                                    type="text"
-                                    class="form-control"
-                                    readonly
-                                    value="{{ calendar_feed_url }}"
-                                    id="calendar-feed-url"
-                                >
-
-                                <button
-                                    type="button"
-                                    class="btn btn-outline-secondary mt-2 w-100"
-                                    onclick="navigator.clipboard.writeText(document.getElementById('calendar-feed-url').value)"
-                                >
-                                    Скопировать ссылку
-                                </button>
-                            </div>
+                    </div>
+                    <hr>
+                    <div class="mb-3">
+                        <label class="form-label">URL подписки на календарь</label>
+                        <input type="text" class="form-control" readonly value="{{ calendar_feed_url }}" id="calendar-feed-url">
+                        <button type="button" class="btn btn-outline-secondary mt-2 w-100" id="copy-feed-url">Скопировать ссылку</button>
                     </div>
                     <hr>
                     <div class="mb-3">
@@ -92,6 +75,10 @@
                                 <option value="{{ value }}">{{ label }}</option>
                             {% endfor %}
                         </select>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="mine-filter">
+                        <label class="form-check-label" for="mine-filter">Только мои бронирования</label>
                     </div>
                     <button id="reset-filters" class="btn btn-light w-100"><i class="fas fa-rotate-left"></i> Сбросить фильтры</button>
                 </div>
@@ -121,23 +108,97 @@
         <div class="col-lg-9">
             <div class="card calendar-card">
                 <div class="card-body">
+                    <div id="calendar-alerts"></div>
                     <div id="event-details" class="event-details-panel">
                         <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                             <h5 id="details-title" class="mb-0"></h5>
                             <button type="button" id="close-details" class="btn-close" aria-label="Закрыть"></button>
                         </div>
-                        <div class="row g-3 small">
+                        <div class="row g-3 small mb-3">
+                            <div class="col-md-4"><strong>Организатор:</strong><br><span id="details-user"></span></div>
                             <div class="col-md-4"><strong>Переговорная:</strong><br><span id="details-room"></span></div>
                             <div class="col-md-4"><strong>Время:</strong><br><span id="details-time"></span></div>
                             <div class="col-md-4"><strong>Статус:</strong><br><span id="details-status"></span></div>
                             <div class="col-md-4"><strong>Участники:</strong><br><span id="details-attendees"></span></div>
                             <div class="col-md-4"><strong>Оборудование:</strong><br><span id="details-equipment"></span></div>
-                            <div class="col-md-4"><strong>Описание:</strong><br><span id="details-description"></span></div>
+                            <div class="col-md-12"><strong>Описание:</strong><br><span id="details-description"></span></div>
+                        </div>
+                        <div id="details-actions" class="d-flex gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" id="edit-booking-btn">Редактировать</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm" id="cancel-booking-btn">Отменить</button>
                         </div>
                     </div>
                     <div id="calendar"></div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editBookingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <form id="edit-booking-form">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Редактировать бронирование</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="edit-form-errors" class="alert alert-danger d-none"></div>
+                    <input type="hidden" id="edit-booking-id">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="edit-title">Название</label>
+                            <input type="text" class="form-control" id="edit-title" name="title" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="edit-room">Переговорная</label>
+                            <select class="form-select" id="edit-room" name="room" required>
+                                {% for room in rooms %}
+                                    <option value="{{ room.id }}">{{ room.name }} — {{ room.capacity }} чел.</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="edit-date">Дата</label>
+                            <input type="date" class="form-control" id="edit-date" name="date" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="edit-start-time">Начало</label>
+                            <input type="time" class="form-control" id="edit-start-time" name="start_time" step="900" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="edit-end-time">Окончание</label>
+                            <input type="time" class="form-control" id="edit-end-time" name="end_time" step="900" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="edit-attendees-count">Участники</label>
+                            <input type="number" class="form-control" id="edit-attendees-count" name="attendees_count" min="1" required>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="edit-needs-projector" name="needs_projector">
+                                <label class="form-check-label" for="edit-needs-projector">Нужен проектор</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="edit-needs-video-conf" name="needs_video_conf">
+                                <label class="form-check-label" for="edit-needs-video-conf">Видеоконференция</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="edit-description">Описание</label>
+                            <textarea class="form-control" id="edit-description" name="description" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -149,17 +210,34 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const calendarEl = document.getElementById('calendar');
+    const alertsEl = document.getElementById('calendar-alerts');
     const roomFilter = document.getElementById('room-filter');
     const statusFilter = document.getElementById('status-filter');
+    const mineFilter = document.getElementById('mine-filter');
     const resetFilters = document.getElementById('reset-filters');
     const detailsPanel = document.getElementById('event-details');
     const closeDetails = document.getElementById('close-details');
+    const editBookingBtn = document.getElementById('edit-booking-btn');
+    const cancelBookingBtn = document.getElementById('cancel-booking-btn');
+    const editModal = new bootstrap.Modal(document.getElementById('editBookingModal'));
+    const editForm = document.getElementById('edit-booking-form');
+    const editErrors = document.getElementById('edit-form-errors');
     const apiEventsUrl = '{% url "api_events" %}';
+    let selectedBooking = null;
 
     if (typeof FullCalendar === 'undefined') {
         calendarEl.innerHTML = '<div class="alert alert-danger">FullCalendar не загрузился. Проверьте доступ к CDN.</div>';
         return;
     }
+
+    const csrfToken = function() {
+        const input = document.querySelector('[name=csrfmiddlewaretoken]');
+        return input ? input.value : '';
+    };
+
+    const showAlert = function(message, type = 'success') {
+        alertsEl.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">${message}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button></div>`;
+    };
 
     const formatDateTime = function(date) {
         return new Intl.DateTimeFormat('ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'}).format(date);
@@ -171,7 +249,12 @@ document.addEventListener('DOMContentLoaded', function() {
         url.searchParams.set('end', info.endStr);
         if (roomFilter.value !== '') url.searchParams.set('room', roomFilter.value);
         if (statusFilter.value !== '') url.searchParams.set('status', statusFilter.value);
+        if (mineFilter.checked) url.searchParams.set('mine', '1');
         return url.toString();
+    };
+
+    const bookingApiUrl = function(bookingId, action = '') {
+        return `/calendar/api/booking/${bookingId}/${action}`;
     };
 
     const showDetails = function(event) {
@@ -180,14 +263,39 @@ document.addEventListener('DOMContentLoaded', function() {
         if (props.needs_projector) equipment.push('проектор');
         if (props.needs_video_conf) equipment.push('видеоконференция');
 
+        selectedBooking = props;
         detailsPanel.classList.add('is-visible');
         document.getElementById('details-title').textContent = event.title;
+        document.getElementById('details-user').textContent = props.user || '—';
         document.getElementById('details-room').textContent = `${props.room}, ${props.floor} этаж, ${props.capacity} чел.`;
         document.getElementById('details-time').textContent = `${formatDateTime(event.start)} — ${formatDateTime(event.end)}`;
         document.getElementById('details-status').innerHTML = `<span class="badge bg-primary">${props.status_display}</span>`;
         document.getElementById('details-attendees').textContent = `${props.attendees_count} чел.`;
         document.getElementById('details-equipment').textContent = equipment.length ? equipment.join(', ') : 'Не требуется';
         document.getElementById('details-description').textContent = props.description || 'Без описания';
+        document.getElementById('details-actions').style.display = props.can_edit ? 'flex' : 'none';
+    };
+
+    const openEditModal = function(booking) {
+        editErrors.classList.add('d-none');
+        editErrors.innerHTML = '';
+        document.getElementById('edit-booking-id').value = booking.id;
+        document.getElementById('edit-title').value = booking.title || '';
+        document.getElementById('edit-room').value = booking.room_id;
+        document.getElementById('edit-date').value = booking.date;
+        document.getElementById('edit-start-time').value = booking.start_time;
+        document.getElementById('edit-end-time').value = booking.end_time;
+        document.getElementById('edit-attendees-count').value = booking.attendees_count;
+        document.getElementById('edit-needs-projector').checked = !!booking.needs_projector;
+        document.getElementById('edit-needs-video-conf').checked = !!booking.needs_video_conf;
+        document.getElementById('edit-description').value = booking.description || '';
+        editModal.show();
+    };
+
+    const renderErrors = function(payload) {
+        if (payload.error) return payload.error;
+        if (!payload.errors) return 'Ошибка сохранения бронирования.';
+        return Object.entries(payload.errors).map(([field, messages]) => `${field}: ${messages.join(', ')}`).join('<br>');
     };
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
@@ -211,7 +319,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 })
                 .then(successCallback)
                 .catch(error => {
-                    calendarEl.insertAdjacentHTML('afterbegin', '<div class="alert alert-danger">Не удалось загрузить события календаря.</div>');
+                    showAlert('Не удалось загрузить события календаря.', 'danger');
                     failureCallback(error);
                 });
         },
@@ -227,14 +335,67 @@ document.addEventListener('DOMContentLoaded', function() {
 
     roomFilter.addEventListener('change', () => calendar.refetchEvents());
     statusFilter.addEventListener('change', () => calendar.refetchEvents());
+    mineFilter.addEventListener('change', () => calendar.refetchEvents());
     resetFilters.addEventListener('click', function() {
         roomFilter.value = '';
         statusFilter.value = '';
+        mineFilter.checked = false;
         detailsPanel.classList.remove('is-visible');
         calendar.refetchEvents();
     });
     closeDetails.addEventListener('click', function() {
         detailsPanel.classList.remove('is-visible');
+    });
+    document.getElementById('copy-feed-url').addEventListener('click', function() {
+        navigator.clipboard.writeText(document.getElementById('calendar-feed-url').value);
+        showAlert('Ссылка подписки скопирована.');
+    });
+
+    editBookingBtn.addEventListener('click', function() {
+        if (!selectedBooking) return;
+        fetch(bookingApiUrl(selectedBooking.id), {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+            .then(response => response.json())
+            .then(openEditModal)
+            .catch(() => showAlert('Не удалось загрузить бронирование.', 'danger'));
+    });
+
+    cancelBookingBtn.addEventListener('click', function() {
+        if (!selectedBooking || !confirm('Отменить это бронирование?')) return;
+        fetch(bookingApiUrl(selectedBooking.id, 'cancel/'), {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken(), 'X-Requested-With': 'XMLHttpRequest'}
+        })
+            .then(response => response.json().then(data => ({ok: response.ok, data})))
+            .then(result => {
+                if (!result.ok || !result.data.success) throw result.data;
+                detailsPanel.classList.remove('is-visible');
+                calendar.refetchEvents();
+                showAlert('Бронирование отменено.');
+            })
+            .catch(payload => showAlert(payload.error || 'Не удалось отменить бронирование.', 'danger'));
+    });
+
+    editForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const bookingId = document.getElementById('edit-booking-id').value;
+        const formData = new FormData(editForm);
+        fetch(bookingApiUrl(bookingId, 'update/'), {
+            method: 'POST',
+            headers: {'X-CSRFToken': csrfToken(), 'X-Requested-With': 'XMLHttpRequest'},
+            body: formData
+        })
+            .then(response => response.json().then(data => ({ok: response.ok, data})))
+            .then(result => {
+                if (!result.ok || !result.data.success) throw result.data;
+                editModal.hide();
+                detailsPanel.classList.remove('is-visible');
+                calendar.refetchEvents();
+                showAlert('Бронирование обновлено.');
+            })
+            .catch(payload => {
+                editErrors.innerHTML = renderErrors(payload);
+                editErrors.classList.remove('d-none');
+            });
     });
 });
 </script>
