@@ -10,7 +10,7 @@ replicas:
   - name: web
     count: 3
   - name: celery-worker
-    count: 2
+    count: 1
   - name: celery-beat
     count: 1
 
