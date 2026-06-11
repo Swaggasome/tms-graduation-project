@@ -48,6 +48,12 @@ class Booking(models.Model):
 
     def clean(self):
         """Валидация на уровне модели"""
+        if self.room and self.attendees_count and self.attendees_count > self.room.capacity:
+            raise ValidationError(
+                f'Количество участников ({self.attendees_count}) превышает вместимость переговорной '
+                f'"{self.room.name}" ({self.room.capacity} чел.).'
+            )
+
         if self.start_time is None or self.end_time is None:
             return
 
