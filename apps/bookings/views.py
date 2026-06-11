@@ -1,12 +1,14 @@
 # apps/bookings/views.py
 
+import hashlib
 from datetime import datetime, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import Http404, HttpResponse, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.http import require_http_methods, require_POST
 
 from .forms import BookingForm
 from .models import Booking, CalendarFeedToken
@@ -15,18 +17,54 @@ from apps.notifications.tasks import send_booking_reminder
 from apps.rooms.models import Room
 
 
-STATUS_COLORS = {
-    'confirmed': '#198754',
-    'pending': '#ffc107',
-    'cancelled': '#dc3545',
-    'completed': '#6c757d',
-    'rejected': '#dc3545',
-}
+USER_COLORS = ['#2563eb', '#16a34a', '#9333ea', '#ea580c', '#dc2626', '#0891b2', '#4f46e5', '#0f766e']
+
+
+def _user_color(user_id):
+    return USER_COLORS[user_id % len(USER_COLORS)]
 
 
 @login_required
 def _user_bookings_queryset(request):
     return Booking.objects.filter(user=request.user).select_related('room').order_by('start_time')
+
+
+def _all_bookings_queryset():
+    return Booking.objects.select_related('room', 'user').order_by('start_time')
+
+
+def _can_edit_booking(user, booking):
+    return user.is_staff or booking.user_id == user.id
+
+
+def _booking_payload(booking, current_user):
+    room = booking.room
+    owner_name = booking.user.get_full_name() or booking.user.username
+    can_edit = _can_edit_booking(current_user, booking)
+    color = _user_color(booking.user_id)
+    return {
+        'id': booking.id,
+        'title': booking.title,
+        'description': booking.description,
+        'room_id': room.id,
+        'room': room.name,
+        'floor': room.floor,
+        'capacity': room.capacity,
+        'user': owner_name,
+        'user_id': booking.user_id,
+        'date': timezone.localtime(booking.start_time).date().isoformat(),
+        'start_time': timezone.localtime(booking.start_time).strftime('%H:%M'),
+        'end_time': timezone.localtime(booking.end_time).strftime('%H:%M'),
+        'start': booking.start_time.isoformat(),
+        'end': booking.end_time.isoformat(),
+        'attendees_count': booking.attendees_count,
+        'status': booking.status,
+        'status_display': booking.get_status_display(),
+        'needs_projector': booking.needs_projector,
+        'needs_video_conf': booking.needs_video_conf,
+        'can_edit': can_edit,
+        'color': color,
+    }
 
 
 def _ics_response(ics_content, filename='smartmeeting-calendar.ics'):
@@ -102,8 +140,7 @@ def create_booking(request):
 
                 if not start_datetime or not end_datetime:
                     messages.error(request, '❌ Ошибка: не указано время начала или окончания')
-                    return render(request, 'bookings/booking_form.html',
-                                  {'form': form, 'title': 'Создание бронирования'})
+                    return render(request, 'bookings/booking_form.html', {'form': form, 'title': 'Создание бронирования'})
 
                 booking = Booking(
                     user=request.user,
@@ -119,16 +156,10 @@ def create_booking(request):
                 )
 
                 booking.save()
-                messages.success(
-                    request,
-                    f'✅ Переговорная "{booking.room.name}" успешно забронирована на {start_datetime.strftime("%d.%m.%Y %H:%M")}!'
-                )
+                messages.success(request, f'✅ Переговорная "{booking.room.name}" успешно забронирована на {start_datetime.strftime("%d.%m.%Y %H:%M")}!')
                 reminder_time = start_datetime - timedelta(hours=1)
                 if reminder_time > timezone.now():
-                    send_booking_reminder.apply_async(
-                        args=[booking.id],
-                        eta=reminder_time
-                    )
+                    send_booking_reminder.apply_async(args=[booking.id], eta=reminder_time)
                     messages.info(request, '🔔 Напоминание будет отправлено за час до встречи')
                 return redirect('calendar')
             except Exception as e:
@@ -148,14 +179,17 @@ def create_booking(request):
 
 @login_required
 def get_events_api(request):
-    """API для получения событий календаря"""
+    """API для получения событий общего календаря."""
     start = request.GET.get('start')
     end = request.GET.get('end')
     room_id = request.GET.get('room')
     status = request.GET.get('status')
+    mine = request.GET.get('mine')
 
-    bookings = _user_bookings_queryset(request)
+    bookings = _all_bookings_queryset()
 
+    if mine == '1':
+        bookings = bookings.filter(user=request.user)
     if start:
         bookings = bookings.filter(start_time__gte=start)
     if end:
@@ -169,28 +203,64 @@ def get_events_api(request):
 
     events = []
     for booking in bookings:
-        room = booking.room
+        payload = _booking_payload(booking, request.user)
         events.append({
             'id': booking.id,
-            'title': f'{booking.title} — {room.name}',
+            'title': f'{booking.title} — {booking.room.name}',
             'start': booking.start_time.isoformat(),
             'end': booking.end_time.isoformat(),
-            'color': STATUS_COLORS.get(booking.status, '#0d6efd'),
-            'textColor': '#ffffff' if booking.status != 'pending' else '#000000',
-            'extendedProps': {
-                'description': booking.description,
-                'room': room.name,
-                'floor': room.floor,
-                'capacity': room.capacity,
-                'attendees_count': booking.attendees_count,
-                'status': booking.status,
-                'status_display': booking.get_status_display(),
-                'needs_projector': booking.needs_projector,
-                'needs_video_conf': booking.needs_video_conf,
-            }
+            'color': payload['color'],
+            'textColor': '#ffffff',
+            'extendedProps': payload,
         })
 
     return JsonResponse(events, safe=False)
+
+
+@login_required
+def booking_detail_api(request, booking_id):
+    booking = get_object_or_404(_all_bookings_queryset(), pk=booking_id)
+    return JsonResponse(_booking_payload(booking, request.user))
+
+
+@login_required
+@require_http_methods(['POST'])
+def update_booking_api(request, booking_id):
+    booking = get_object_or_404(_all_bookings_queryset(), pk=booking_id)
+    if not _can_edit_booking(request.user, booking):
+        return JsonResponse({'success': False, 'error': 'Можно редактировать только свои бронирования.'}, status=403)
+    if booking.status == 'cancelled':
+        return JsonResponse({'success': False, 'error': 'Отменённое бронирование нельзя редактировать.'}, status=400)
+
+    form = BookingForm(request.POST, exclude_booking_id=booking.id)
+    if not form.is_valid():
+        return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+    booking.room = form.cleaned_data['room']
+    booking.title = form.cleaned_data['title']
+    booking.description = form.cleaned_data.get('description', '')
+    booking.start_time = form.cleaned_data['start_datetime']
+    booking.end_time = form.cleaned_data['end_datetime']
+    booking.attendees_count = form.cleaned_data['attendees_count']
+    booking.needs_projector = form.cleaned_data['needs_projector']
+    booking.needs_video_conf = form.cleaned_data['needs_video_conf']
+    booking.save()
+
+    return JsonResponse({'success': True, 'booking': _booking_payload(booking, request.user)})
+
+
+@login_required
+@require_POST
+def cancel_booking_api(request, booking_id):
+    booking = get_object_or_404(_all_bookings_queryset(), pk=booking_id)
+    if not _can_edit_booking(request.user, booking):
+        return JsonResponse({'success': False, 'error': 'Можно отменять только свои бронирования.'}, status=403)
+    if booking.status == 'cancelled':
+        return JsonResponse({'success': True})
+
+    booking.status = 'cancelled'
+    booking.save(update_fields=['status', 'updated_at'])
+    return JsonResponse({'success': True})
 
 
 @login_required
