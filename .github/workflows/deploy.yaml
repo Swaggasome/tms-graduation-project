@@ -140,28 +140,22 @@ jobs:
             YC_STORAGE_ACCESS_KEY="${{ secrets.YC_STORAGE_ACCESS_KEY }}"
             YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
             USE_S3_STATIC="${{ secrets.USE_S3_STATIC }}"
-            if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "feature" ]]; then
-              SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
-              DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
-              USE_S3_STATIC="${{ secrets.USE_S3_STATIC }}"
-            else
-              DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
-            fi
+            DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
           fi
 
-          cat > k8s/base/.env.secret <<EOF
-          DB_USER=${DB_USER}
-          DB_PASSWORD=${DB_PASSWORD}
-          DB_DATABASE=${DB_DATABASE}
-          DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
-          EMAIL_HOST_USER=${EMAIL_HOST_USER}
-          EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
-          DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
-          YC_STORAGE_BUCKET_NAME=${YC_STORAGE_BUCKET_NAME}
-          YC_STORAGE_ACCESS_KEY=${YC_STORAGE_ACCESS_KEY}
-          YC_STORAGE_SECRET_KEY=${YC_STORAGE_SECRET_KEY}
-          USE_S3_STATIC=${USE_S3_STATIC}
-          EOF
+          {
+            echo "DB_USER=${DB_USER}"
+            echo "DB_PASSWORD=${DB_PASSWORD}"
+            echo "DB_DATABASE=${DB_DATABASE}"
+            echo "DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}"
+            echo "EMAIL_HOST_USER=${EMAIL_HOST_USER}"
+            echo "EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}"
+            echo "DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}"
+            echo "YC_STORAGE_BUCKET_NAME=${YC_STORAGE_BUCKET_NAME}"
+            echo "YC_STORAGE_ACCESS_KEY=${YC_STORAGE_ACCESS_KEY}"
+            echo "YC_STORAGE_SECRET_KEY=${YC_STORAGE_SECRET_KEY}"
+            echo "USE_S3_STATIC=${USE_S3_STATIC}"
+          } > k8s/base/.env.secret
 
       - name: Prepare kustomize overlay
         shell: bash
@@ -216,7 +210,7 @@ jobs:
 
             echo "Running job: ${JOB_NAME}"
 
-            kubectl delete job "${JOB_NAME}" \
+            kubectl delete pod "${JOB_NAME}" \
               -n "${NAMESPACE}" \
               --ignore-not-found=true
 
@@ -226,8 +220,7 @@ jobs:
               --restart=Never \
               --attach=true \
               --rm=true \
-              --env-from=configmap/smartmeeting-config \
-              --env-from=secret/secrets-project \
+              --env="DJANGO_SETTINGS_MODULE=smartmeeting.settings" \
               --command -- /bin/sh -c "${COMMAND}"
           }
 
