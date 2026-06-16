@@ -3,7 +3,7 @@ from django.db import models
 
 
 class Room(models.Model):
-    name = models.CharField('Название', max_length=100)
+    name = models.CharField('Название', max_length=255, unique=True)
     capacity = models.PositiveIntegerField('Вместимость')
     floor = models.PositiveSmallIntegerField('Этаж')
 
