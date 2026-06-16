@@ -201,6 +201,53 @@ jobs:
       - name: Validate manifests
         run: |
           kubectl apply --dry-run=client -k "$OVERLAY_PATH"
+      
+      - name: Run Django setup commands
+        env:
+          NAMESPACE: ${{ steps.env.outputs.NAMESPACE }}
+        shell: bash
+        run: |
+          set -e
+
+          run_job() {
+            JOB_NAME=$1
+            COMMAND=$2
+
+            kubectl delete job "$JOB_NAME" -n "$NAMESPACE" --ignore-not-found=true
+
+            cat <<EOF | kubectl apply -f -
+            apiVersion: batch/v1
+            kind: Job
+            metadata:
+              name: ${JOB_NAME}
+              namespace: ${NAMESPACE}
+            spec:
+              backoffLimit: 3
+              template:
+                spec:
+                  restartPolicy: Never
+                  containers:
+                  - name: ${JOB_NAME}
+                    image: ${IMAGE_NAME}:${IMAGE_TAG}
+                    command: ["sh","-c","${COMMAND}"]
+                    envFrom:
+                    - configMapRef:
+                        name: smartmeeting-config
+                    - secretRef:
+                        name: secrets-project
+            EOF
+
+            kubectl wait \
+              --for=condition=complete \
+              job/${JOB_NAME} \
+              -n ${NAMESPACE} \
+              --timeout=300s
+          }
+
+          run_job django-migrate "python manage.py migrate"
+          run_job django-create-rooms "python manage.py create_rooms"
+          run_job django-reminder-schedule "python manage.py setup_reminder_schedule"
+          run_job django-collectstatic "python manage.py collectstatic --noinput"
 
       - name: Deploy and rollback on failure
         env:
