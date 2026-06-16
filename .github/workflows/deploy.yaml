@@ -211,7 +211,8 @@ jobs:
 
           run_job() {
             JOB_NAME="$1"
-            COMMAND="$2"
+            shift
+            COMMAND="$*"
 
             echo "Running job: ${JOB_NAME}"
 
@@ -219,51 +220,21 @@ jobs:
               -n "${NAMESPACE}" \
               --ignore-not-found=true
 
-            cat > /tmp/job.yaml <<EOF
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: ${JOB_NAME}
-  namespace: ${NAMESPACE}
-spec:
-  backoffLimit: 3
-  template:
-    spec:
-      restartPolicy: Never
-      containers:
-        - name: ${JOB_NAME}
-          image: ${IMAGE_NAME}:${IMAGE_TAG}
-          imagePullPolicy: IfNotPresent
-          command: ["/bin/sh", "-c", "${COMMAND}"]
-          envFrom:
-            - configMapRef:
-                name: smartmeeting-config
-            - secretRef:
-                name: secrets-project
-EOF
-
-            kubectl apply -f /tmp/job.yaml
-
-            kubectl wait \
-              --for=condition=complete \
-              job/"${JOB_NAME}" \
+            kubectl run "${JOB_NAME}" \
               -n "${NAMESPACE}" \
-              --timeout=300s || {
-                echo "Job failed: ${JOB_NAME}"
-                kubectl logs job/"${JOB_NAME}" -n "${NAMESPACE}" --all-containers=true || true
-                kubectl describe job/"${JOB_NAME}" -n "${NAMESPACE}" || true
-                exit 1
-              }
-
-            kubectl logs job/"${JOB_NAME}" \
-              -n "${NAMESPACE}" \
-              --all-containers=true || true
+              --image="${IMAGE_NAME}:${IMAGE_TAG}" \
+              --restart=Never \
+              --attach=true \
+              --rm=true \
+              --env-from=configmap/smartmeeting-config \
+              --env-from=secret/secrets-project \
+              --command -- /bin/sh -c "${COMMAND}"
           }
 
-          run_job django-migrate "python manage.py migrate"
-          run_job django-create-rooms "python manage.py create_rooms"
-          run_job django-reminder-schedule "python manage.py setup_reminder_schedule"
-          run_job django-collectstatic "python manage.py collectstatic --noinput"
+          run_job django-migrate python manage.py migrate
+          run_job django-create-rooms python manage.py create_rooms
+          run_job django-reminder-schedule python manage.py setup_reminder_schedule
+          run_job django-collectstatic python manage.py collectstatic --noinput
 
       - name: Deploy and rollback on failure
         env:
@@ -330,7 +301,6 @@ EOF
         if: always()
         run: |
           rm -f /tmp/sa-key.json
-          rm -f /tmp/job.yaml
           rm -f k8s/base/.env.secret
           rm -rf k8s/overlays/temp
           rm -rf /tmp/k8s-cluster
