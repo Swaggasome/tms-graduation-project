@@ -15,43 +15,6 @@ spec:
       labels:
         component: web
     spec:
-      initContainers:
-        - name: run-migrations
-          image: smartmeeting-app
-          imagePullPolicy: IfNotPresent
-          command: ["python", "manage.py", "migrate"]
-          envFrom:
-            - configMapRef:
-                name: smartmeeting-config
-            - secretRef:
-                name: secrets-project
-        - name: run-create-rooms
-          image: smartmeeting-app
-          imagePullPolicy: IfNotPresent
-          command: ["python", "manage.py", "create_rooms"]
-          envFrom:
-            - configMapRef:
-                name: smartmeeting-config
-            - secretRef:
-                name: secrets-project
-        - name: run-setup-reminder-schedule
-          image: smartmeeting-app
-          imagePullPolicy: IfNotPresent
-          command: ["python", "manage.py", "setup_reminder_schedule"]
-          envFrom:
-            - configMapRef:
-                name: smartmeeting-config
-            - secretRef:
-                name: secrets-project
-        - name: run-collectstatic
-          image: smartmeeting-app
-          imagePullPolicy: IfNotPresent
-          command: ["python", "manage.py", "collectstatic", "--noinput"]
-          envFrom:
-            - configMapRef:
-                name: smartmeeting-config
-            - secretRef:
-                name: secrets-project
       containers:
         - name: web
           image: smartmeeting-app
