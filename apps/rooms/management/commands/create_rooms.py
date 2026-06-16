@@ -20,14 +20,14 @@ class Command(BaseCommand):
         ]
 
         for room_data in rooms:
-            room, created = Room.objects.get_or_create(
+            _, created = Room.objects.get_or_create(
                 name=room_data['name'],
                 defaults=room_data
             )
             if created:
-                self.stdout.write(self.style.SUCCESS(f'✓ Создана комната: {room.name}'))
+                self.stdout.write(self.style.SUCCESS(f'✓ Создана комната: {room_data['name']}'))
             else:
-                self.stdout.write(f'• Комната уже существует: {room.name}')
+                self.stdout.write(f'• Комната уже существует: {room_data['name']}')
 
         self.stdout.write(self.style.SUCCESS(f'\n✅ Всего комнат: {Room.objects.count()}'))
 
