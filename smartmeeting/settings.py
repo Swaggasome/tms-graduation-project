@@ -124,49 +124,58 @@ USE_I18N = True
 USE_TZ = True
 
 # Статика и медиа
-YC_STORAGE_BUCKET_NAME = os.getenv("YC_STORAGE_BUCKET_NAME")
-YC_STORAGE_ACCESS_KEY = os.getenv("YC_STORAGE_ACCESS_KEY")
-YC_STORAGE_SECRET_KEY = os.getenv("YC_STORAGE_SECRET_KEY")
+USE_S3_STATIC = os.getenv("USE_S3_STATIC", "False").lower() in ("true", "1", "yes")
 
-AWS_S3_ENDPOINT_URL = "https://storage.yandexcloud.net"
-AWS_S3_REGION_NAME = "ru-central1"
-AWS_STORAGE_BUCKET_NAME = YC_STORAGE_BUCKET_NAME
-AWS_ACCESS_KEY_ID = YC_STORAGE_ACCESS_KEY
-AWS_SECRET_ACCESS_KEY = YC_STORAGE_SECRET_KEY
+if USE_S3_STATIC:
+    YC_STORAGE_BUCKET_NAME = os.getenv("YC_STORAGE_BUCKET_NAME")
+    YC_STORAGE_ACCESS_KEY = os.getenv("YC_STORAGE_ACCESS_KEY")
+    YC_STORAGE_SECRET_KEY = os.getenv("YC_STORAGE_SECRET_KEY")
 
-AWS_LOCATION = "static"
-AWS_QUERYSTRING_AUTH = False
-AWS_DEFAULT_ACL = "public-read"
+    AWS_S3_ENDPOINT_URL = "https://storage.yandexcloud.net"
+    AWS_S3_REGION_NAME = "ru-central1"
+    AWS_STORAGE_BUCKET_NAME = YC_STORAGE_BUCKET_NAME
+    AWS_ACCESS_KEY_ID = YC_STORAGE_ACCESS_KEY
+    AWS_SECRET_ACCESS_KEY = YC_STORAGE_SECRET_KEY
 
-STATIC_URL = f"https://storage.yandexcloud.net/{YC_STORAGE_BUCKET_NAME}/static/"
+    AWS_LOCATION = "static"
+    AWS_QUERYSTRING_AUTH = False
+    AWS_DEFAULT_ACL = "public-read"
 
-STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "storages.backends.s3.S3Storage",
-        "OPTIONS": {
-            "bucket_name": YC_STORAGE_BUCKET_NAME,
-            "access_key": YC_STORAGE_ACCESS_KEY,
-            "secret_key": YC_STORAGE_SECRET_KEY,
-            "endpoint_url": AWS_S3_ENDPOINT_URL,
-            "region_name": AWS_S3_REGION_NAME,
-            "location": AWS_LOCATION,
-            "default_acl": "public-read",
-            "querystring_auth": False,
-            "object_parameters": {
-                "CacheControl": "max-age=86400",
+    STATIC_URL = f"https://storage.yandexcloud.net/{YC_STORAGE_BUCKET_NAME}/static/"
+
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "storages.backends.s3.S3Storage",
+            "OPTIONS": {
+                "bucket_name": YC_STORAGE_BUCKET_NAME,
+                "access_key": YC_STORAGE_ACCESS_KEY,
+                "secret_key": YC_STORAGE_SECRET_KEY,
+                "endpoint_url": AWS_S3_ENDPOINT_URL,
+                "region_name": AWS_S3_REGION_NAME,
+                "location": AWS_LOCATION,
+                "default_acl": "public-read",
+                "querystring_auth": False,
             },
         },
-    },
-}
-# STATIC_URL = '/static/'
-# STATICFILES_DIRS = [BASE_DIR / 'static']
-# STATIC_ROOT = BASE_DIR / 'staticfiles'
+    }
+else:
+    STATIC_URL = "/static/"
+    STATIC_ROOT = BASE_DIR / "staticfiles"
 
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 # Celery
 CELERY_BROKER_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
@@ -181,7 +190,7 @@ CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 # Email
 EMAIL_BACKEND = os.environ.get(
     'EMAIL_BACKEND', 
-    'django.core.mail.backends.console.EmailBackend'
+    'django.core.mail.backends.smtp.EmailBackend'
 )
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))

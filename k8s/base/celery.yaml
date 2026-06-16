@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: celery-worker
 spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
   replicas: 1
   selector:
     matchLabels:
@@ -14,7 +17,7 @@ spec:
     spec:
       containers:
         - name: celery
-          image: cr.yandex/crp4hm8njs66k72arusc/smartmeeting:dev
+          image: smartmeeting-app
           imagePullPolicy: IfNotPresent
           command: ["celery", "-A", "smartmeeting", "worker", "-l", "info"]
           envFrom:
@@ -35,6 +38,9 @@ kind: Deployment
 metadata:
   name: celery-beat
 spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
   replicas: 1
   selector:
     matchLabels:
@@ -46,7 +52,7 @@ spec:
     spec:
       containers:
         - name: celery-beat
-          image: cr.yandex/crp4hm8njs66k72arusc/smartmeeting:dev
+          image: smartmeeting-app
           imagePullPolicy: IfNotPresent
           command:
             - "celery"

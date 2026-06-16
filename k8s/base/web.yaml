@@ -3,6 +3,9 @@ kind: Deployment
 metadata:
   name: web
 spec:
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
   replicas: 1
   selector:
     matchLabels:
@@ -14,7 +17,7 @@ spec:
     spec:
       containers:
         - name: web
-          image: cr.yandex/crp4hm8njs66k72arusc/smartmeeting:dev
+          image: smartmeeting-app
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000

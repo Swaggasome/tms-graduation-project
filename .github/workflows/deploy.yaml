@@ -30,13 +30,16 @@ jobs:
             ENVIRONMENT="production"
             NAMESPACE="smartmeeting-prod"
             OVERLAY="production"
+            APP_DOMAIN="${{ secrets.PROD_APP_DOMAIN }}"
           elif [[ "$BRANCH" == "staging" ]]; then
             ENVIRONMENT="staging"
             NAMESPACE="smartmeeting-staging"
             OVERLAY="staging"
+            APP_DOMAIN="${{ secrets.STAGING_APP_DOMAIN }}"
           elif [[ "$BRANCH" =~ ^feature/ ]]; then
             ENVIRONMENT="feature"
             OVERLAY="feature"
+            APP_DOMAIN="${{ secrets.STAGING_APP_DOMAIN }}"
 
             RAW_NAME="feature-${BRANCH#feature/}"
             NAMESPACE=$(echo "$RAW_NAME" \
@@ -52,6 +55,7 @@ jobs:
           echo "ENVIRONMENT=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
           echo "NAMESPACE=$NAMESPACE" >> "$GITHUB_OUTPUT"
           echo "OVERLAY=$OVERLAY" >> "$GITHUB_OUTPUT"
+          echo "APP_DOMAIN=$APP_DOMAIN" >> "$GITHUB_OUTPUT"
 
       - name: Login to Yandex Container Registry
         uses: yc-actions/yc-cr-login@v1
@@ -78,7 +82,7 @@ jobs:
       - name: Get Kubernetes credentials
         run: |
           yc managed-kubernetes cluster get-credentials \
-            ${{ secrets.YC_K8S_CLUSTER_NAME }} \
+            ${{ secrets.YC_K8S_CLUSTER_ID }} \
             --folder-id ${{ secrets.YC_FOLDER_ID }} \
             --external
 
@@ -120,21 +124,26 @@ jobs:
             DJANGO_SECRET_KEY="${{ secrets.PROD_DJANGO_SECRET_KEY }}"
             EMAIL_HOST_USER="${{ secrets.EMAIL_HOST_USER }}"
             EMAIL_HOST_PASSWORD="${{ secrets.EMAIL_HOST_PASSWORD }}"
+            DEFAULT_FROM_EMAIL="${{ secrets.DEFAULT_FROM_EMAIL }}"
             YC_STORAGE_BUCKET_NAME="${{ secrets.YC_STORAGE_BUCKET_NAME }}"
             YC_STORAGE_ACCESS_KEY="${{ secrets.YC_STORAGE_ACCESS_KEY }}"
             YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
+            USE_S3_STATIC="${{ secrets.USE_S3_STATIC }}"
           else
             DB_USER="${{ secrets.STAGING_DB_USER }}"
             DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}"
             DJANGO_SECRET_KEY="${{ secrets.STAGING_DJANGO_SECRET_KEY }}"
             EMAIL_HOST_USER="${{ secrets.EMAIL_HOST_USER }}"
             EMAIL_HOST_PASSWORD="${{ secrets.EMAIL_HOST_PASSWORD }}"
+            DEFAULT_FROM_EMAIL="${{ secrets.DEFAULT_FROM_EMAIL }}"
             YC_STORAGE_BUCKET_NAME="${{ secrets.YC_STORAGE_BUCKET_NAME }}"
             YC_STORAGE_ACCESS_KEY="${{ secrets.YC_STORAGE_ACCESS_KEY }}"
             YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
+            USE_S3_STATIC="${{ secrets.USE_S3_STATIC }}"
             if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "feature" ]]; then
               SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
               DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
+              USE_S3_STATIC="${{ secrets.USE_S3_STATIC }}"
             else
               DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
             fi
@@ -147,9 +156,11 @@ jobs:
           DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
           EMAIL_HOST_USER=${EMAIL_HOST_USER}
           EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+          DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
           YC_STORAGE_BUCKET_NAME=${YC_STORAGE_BUCKET_NAME}
           YC_STORAGE_ACCESS_KEY=${YC_STORAGE_ACCESS_KEY}
           YC_STORAGE_SECRET_KEY=${YC_STORAGE_SECRET_KEY}
+          USE_S3_STATIC=${USE_S3_STATIC}
           EOF
 
       - name: Prepare kustomize overlay
@@ -166,6 +177,20 @@ jobs:
             OVERLAY_PATH="k8s/overlays/$OVERLAY"
           fi
 
+          export APP_DOMAIN="${{ steps.env.outputs.APP_DOMAIN }}"
+
+          if [[ -z "$APP_DOMAIN" ]]; then
+            echo "APP_DOMAIN is required"
+            exit 1
+          fi
+
+          for file in "$OVERLAY_PATH"/ingress-patch.yaml "$OVERLAY_PATH"/configmap-patch.yaml; do
+            if [[ -f "$file" ]]; then
+              envsubst < "$file" > "$file.tmp"
+              mv "$file.tmp" "$file"
+            fi
+          done
+
           cd "$OVERLAY_PATH"
 
           kustomize edit set namespace "$NAMESPACE"
@@ -177,17 +202,66 @@ jobs:
         run: |
           kubectl apply --dry-run=client -k "$OVERLAY_PATH"
 
-      - name: Deploy
-        run: |
-          kubectl apply -k "$OVERLAY_PATH"
-
-      - name: Wait for deployments
+      - name: Deploy and rollback on failure
         env:
           NAMESPACE: ${{ steps.env.outputs.NAMESPACE }}
+        shell: bash
         run: |
-          kubectl rollout status deployment/web -n "$NAMESPACE" --timeout=300s
-          kubectl rollout status deployment/celery-worker -n "$NAMESPACE" --timeout=300s
-          kubectl rollout status deployment/celery-beat -n "$NAMESPACE" --timeout=300s
+          set -e
+
+          DEPLOYMENTS=("web" "celery-worker" "celery-beat")
+
+          echo "Applying manifests..."
+          kubectl apply -k "$OVERLAY_PATH"
+
+          echo "Annotating deployments..."
+          for deploy in "${DEPLOYMENTS[@]}"; do
+            kubectl annotate deployment/"$deploy" \
+              kubernetes.io/change-cause="Deploy image $IMAGE_NAME:$IMAGE_TAG from commit $GITHUB_SHA" \
+              -n "$NAMESPACE" --overwrite || true
+          done
+
+          failed=0
+
+          for deploy in "${DEPLOYMENTS[@]}"; do
+            echo "Waiting for deployment/$deploy..."
+
+            if ! kubectl rollout status deployment/"$deploy" -n "$NAMESPACE" --timeout=300s; then
+              echo "Deployment failed: $deploy"
+              failed=1
+            fi
+          done
+
+          if [[ "$failed" -eq 1 ]]; then
+            echo "Deployment failed. Starting rollback..."
+
+            for deploy in "${DEPLOYMENTS[@]}"; do
+              echo "Rolling back deployment/$deploy..."
+              kubectl rollout undo deployment/"$deploy" -n "$NAMESPACE" || true
+            done
+
+            echo "Waiting for rollback..."
+
+            for deploy in "${DEPLOYMENTS[@]}"; do
+              kubectl rollout status deployment/"$deploy" -n "$NAMESPACE" --timeout=300s || true
+            done
+
+            echo "Pods after rollback:"
+            kubectl get pods -n "$NAMESPACE" -o wide
+
+            echo "Deployment history:"
+            for deploy in "${DEPLOYMENTS[@]}"; do
+              echo "History for deployment/$deploy:"
+              kubectl rollout history deployment/"$deploy" -n "$NAMESPACE" || true
+            done
+
+            echo "Recent events:"
+            kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp | tail -n 50
+
+            exit 1
+          fi
+
+          echo "Deployment completed successfully"
 
       - name: Cleanup
         if: always()
