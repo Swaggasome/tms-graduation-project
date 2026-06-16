@@ -140,22 +140,28 @@ jobs:
             YC_STORAGE_ACCESS_KEY="${{ secrets.YC_STORAGE_ACCESS_KEY }}"
             YC_STORAGE_SECRET_KEY="${{ secrets.YC_STORAGE_SECRET_KEY }}"
             USE_S3_STATIC="${{ secrets.USE_S3_STATIC }}"
-            DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
+            if [[ "${{ steps.env.outputs.ENVIRONMENT }}" == "feature" ]]; then
+              SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+              DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
+              USE_S3_STATIC="${{ secrets.USE_S3_STATIC }}"
+            else
+              DB_DATABASE="${{ secrets.STAGING_DB_DATABASE }}"
+            fi
           fi
 
-          {
-            echo "DB_USER=${DB_USER}"
-            echo "DB_PASSWORD=${DB_PASSWORD}"
-            echo "DB_DATABASE=${DB_DATABASE}"
-            echo "DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}"
-            echo "EMAIL_HOST_USER=${EMAIL_HOST_USER}"
-            echo "EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}"
-            echo "DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}"
-            echo "YC_STORAGE_BUCKET_NAME=${YC_STORAGE_BUCKET_NAME}"
-            echo "YC_STORAGE_ACCESS_KEY=${YC_STORAGE_ACCESS_KEY}"
-            echo "YC_STORAGE_SECRET_KEY=${YC_STORAGE_SECRET_KEY}"
-            echo "USE_S3_STATIC=${USE_S3_STATIC}"
-          } > k8s/base/.env.secret
+          cat > k8s/base/.env.secret <<EOF
+          DB_USER=${DB_USER}
+          DB_PASSWORD=${DB_PASSWORD}
+          DB_DATABASE=${DB_DATABASE}
+          DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+          EMAIL_HOST_USER=${EMAIL_HOST_USER}
+          EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+          DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL}
+          YC_STORAGE_BUCKET_NAME=${YC_STORAGE_BUCKET_NAME}
+          YC_STORAGE_ACCESS_KEY=${YC_STORAGE_ACCESS_KEY}
+          YC_STORAGE_SECRET_KEY=${YC_STORAGE_SECRET_KEY}
+          USE_S3_STATIC=${USE_S3_STATIC}
+          EOF
 
       - name: Prepare kustomize overlay
         shell: bash
@@ -195,39 +201,6 @@ jobs:
       - name: Validate manifests
         run: |
           kubectl apply --dry-run=client -k "$OVERLAY_PATH"
-
-      - name: Run Django setup commands
-        env:
-          NAMESPACE: ${{ steps.env.outputs.NAMESPACE }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          run_job() {
-            JOB_NAME="$1"
-            shift
-            COMMAND="$*"
-
-            echo "Running job: ${JOB_NAME}"
-
-            kubectl delete pod "${JOB_NAME}" \
-              -n "${NAMESPACE}" \
-              --ignore-not-found=true
-
-            kubectl run "${JOB_NAME}" \
-              -n "${NAMESPACE}" \
-              --image="${IMAGE_NAME}:${IMAGE_TAG}" \
-              --restart=Never \
-              --attach=true \
-              --rm=true \
-              --env="DJANGO_SETTINGS_MODULE=smartmeeting.settings" \
-              --command -- /bin/sh -c "${COMMAND}"
-          }
-
-          run_job django-migrate python manage.py migrate
-          run_job django-create-rooms python manage.py create_rooms
-          run_job django-reminder-schedule python manage.py setup_reminder_schedule
-          run_job django-collectstatic python manage.py collectstatic --noinput
 
       - name: Deploy and rollback on failure
         env:
