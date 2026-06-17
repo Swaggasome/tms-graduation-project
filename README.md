@@ -20,7 +20,7 @@
 
 - [Назначение проекта](#назначение-проекта)
 - [Репозитории проекта](#репозитории-проекта)
-- [Repository Structure](#repository-structure)
+- [Структура репазиториев](#структура-репазиториев)
 - [Стек](#стек)
 - [Архитектура](#архитектура)
 - [Git flow и правила веток](#git-flow-и-правила-веток)
@@ -49,11 +49,11 @@ SmartMeeting предназначен для бронирования перег
 
 | Репозиторий | Назначение |
 |---|---|
-| `tms-graduation-project` | Django-приложение, Dockerfile, docker-compose, Kubernetes-манифесты, GitHub Actions CI/CD |
-| `tms-graduation-project-infra-backend` | Bootstrap Terraform backend: S3-compatible bucket в Yandex Object Storage для хранения Terraform state |
-| `tms-graduation-project-infra` | Основная инфраструктура Yandex Cloud: Managed Kubernetes, node group, VPC, Container Registry, Object Storage, service accounts, IAM-роли |
+| [`tms-graduation-project`](https://github.com/Swaggasome/tms-graduation-project.git) | Django-приложение, Dockerfile, docker-compose, Kubernetes-манифесты, GitHub Actions CI/CD |
+| [`tms-graduation-project-infra-backend`](https://github.com/Swaggasome/tms-graduation-project-infra-backend.git) | Bootstrap Terraform backend: S3-compatible bucket в Yandex Object Storage для хранения Terraform state |
+| [`tms-graduation-project-infra`](https://github.com/Swaggasome/tms-graduation-project-infra.git) | Основная инфраструктура Yandex Cloud: Managed Kubernetes, node group, VPC, Container Registry, Object Storage, service accounts, IAM-роли |
 
-### Repository Dependency Diagram
+### Диаграмма зависимостей репозитория
 
 ```mermaid
 flowchart LR
@@ -77,7 +77,7 @@ flowchart LR
 
 ---
 
-## Repository Structure
+## Структура репазиториев
 
 Проект разделён на три самостоятельных репозитория: приложение, bootstrap backend для Terraform state и основная инфраструктура.
 
@@ -149,13 +149,12 @@ tms-graduation-project-infra/
 └── README.md                        # Документация основной инфраструктуры
 ```
 
-> Имена отдельных Terraform-файлов могут отличаться от примера, но логическое разделение должно сохраняться: provider/backend, IAM, network, registry, storage, Kubernetes cluster, node group, variables и outputs.
 
 ---
 
 ## Стек
 
-### Application
+### Приложение
 
 | Компонент | Использование |
 |---|---|
@@ -168,7 +167,7 @@ tms-graduation-project-infra/
 | Gunicorn | WSGI-сервер |
 | Docker / Docker Compose | Локальная разработка и упаковка приложения |
 
-### Infrastructure / Platform
+### Инфраструктура
 
 | Компонент | Использование |
 |---|---|
@@ -187,7 +186,7 @@ tms-graduation-project-infra/
 
 ## Архитектура
 
-### Infrastructure Diagram
+### Диаграмма инфраструктуры
 
 ```mermaid
 flowchart TB
@@ -224,7 +223,7 @@ flowchart TB
     K8S --> Monitoring
 ```
 
-### Runtime Components
+### Компоненты среды выполнения
 
 ```mermaid
 flowchart TB
